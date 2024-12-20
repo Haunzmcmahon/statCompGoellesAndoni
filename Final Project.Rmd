@@ -1,0 +1,274 @@
+---
+title: "STCO - Project"
+author: "Group 6: Johannes Gölles, Kevin Andoni"
+date: "2024-12-06"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+# List of required packages
+packages <- c("simFrame", "dplyr", "ggplot2", "sjPlot", "interactions")
+
+# Install missing packages and load all, suppressing messages and warnings
+invisible(lapply(packages, function(pkg) {
+  if (!requireNamespace(pkg, quietly = TRUE)) {
+    install.packages(pkg)
+  }
+  suppressPackageStartupMessages({
+    suppressWarnings(library(pkg, character.only = TRUE))
+  })
+}))
+```
+
+
+```{r}
+# Load the eusilcP dataset
+data("eusilcP", package = "simFrame")
+# ?eusilcP
+# Define NUTS-2 regions corresponding to "East Austria" (AT1)
+east_austria_regions <- c("Burgenland", "Lower Austria", "Vienna")
+
+# Subset the data for East Austria and select relevant variables
+subset_data <- subset(
+  eusilcP,
+  region %in% east_austria_regions,
+  select = c("py100n", "main", "ecoStat", "hsize", "age", "region")
+)
+
+# Adjust factor levels of 'region' to only include selected regions
+subset_data$region <- droplevels(subset_data$region)
+
+# View a summary of the subset data
+head(subset_data)
+```
+
+
+```{r}
+# Rename columns for clarity
+cleaned_data <- subset_data %>%
+  rename(
+    income = py100n,
+    employment_status = main,
+    economic_status = ecoStat,
+    household_size = hsize,
+    age_years = age,
+    region_name = region
+  )
+```
+
+
+```{r}
+# Option 1: Remove rows with any missing values
+cleaned_data <- cleaned_data %>% na.omit() # We lose ~4000 rows
+
+# Replace numeric levels of economic_status with abbreviations
+cleaned_data$economic_status <- factor(cleaned_data$economic_status, 
+                                       levels = c(1, 2, 3, 4, 5, 6, 7),
+                                       labels = c(
+                                         "FT_Work",    # Working Full Time
+                                         "PT_Work",    # Working Part Time
+                                         "Unemployed", # Unemployed
+                                         "Student",    # Pupil/Student/Training/Military Service
+                                         "Retired",    # Retired/Early Retirement/Given Up Business
+                                         "Disabled",   # Permanently Disabled/Unfit to Work/Other Inactive
+                                         "Domestic"    # Domestic Tasks/Care Responsibilities
+                                       ))
+
+# Check the updated levels of economic_status
+levels(cleaned_data$economic_status)
+
+print(head(cleaned_data))
+
+```
+
+```{r}
+# Reclassify economic_status for inconsistent rows and preserve factor levels
+cleaned_data <- cleaned_data %>%
+  mutate(economic_status = ifelse((economic_status %in% c("FT_Work", "PT_Work")) & 
+                                  employment_status == FALSE & 
+                                  income == 0, 
+                                  "Unemployed", 
+                                  as.character(economic_status))) %>%
+  mutate(economic_status = factor(economic_status, 
+                                  levels = c("FT_Work", "PT_Work", "Unemployed", 
+                                             "Student", "Retired", "Disabled", "Domestic")))
+print(head(cleaned_data))
+```
+
+```{r}
+# Check updated levels of economic_status
+levels(cleaned_data$economic_status)
+
+# View summary of cleaned_data
+summary(cleaned_data)
+```
+
+
+## Investigate Inconsistencies
+
+```{r}
+# Identify inconsistent rows
+inconsistent_rows <- cleaned_data %>%
+  filter((economic_status %in% c("FT_Work", "PT_Work")) & 
+         employment_status == FALSE & 
+         income == 0)
+
+# View inconsistent rows
+print(inconsistent_rows)
+```
+
+
+## Reclassify Economic Status
+
+```{r}
+# Reclassify economic_status for inconsistent rows
+cleaned_data <- cleaned_data %>%
+  mutate(economic_status = ifelse((economic_status %in% c("FT_Work", "PT_Work")) & 
+                                  employment_status == FALSE & 
+                                  income == 0, 
+                                  "Unemployed", 
+                                  economic_status))
+print(head(cleaned_data))
+
+```
+
+
+
+
+```{r}
+# Option 2: Alternatively, impute missing values (e.g., median for numeric variables)
+# cleaned_data <- cleaned_data %>%
+#   mutate(
+#     income = ifelse(is.na(income), median(income, na.rm = TRUE), income),
+#     household_size = ifelse(is.na(household_size), median(household_size, na.rm = TRUE), household_size),
+#     age_years = ifelse(is.na(age_years), median(age_years, na.rm = TRUE), age_years)
+#   )
+
+# View a summary of the cleaned data
+# cleaned_data
+```
+
+
+
+## 1. Impact of Employment Status on Income
+
+```{r}
+# Boxplot to visualize income distribution by employment status
+ggplot(cleaned_data, aes(x = employment_status, y = income, fill = employment_status)) +
+  geom_boxplot() +
+  labs(title = "Income Distribution by Employment Status", x = "Employment Status", y = "Income") +
+  theme_minimal()
+
+# ANOVA test to check for significant differences in income across employment statuses
+anova_result <- aov(income ~ employment_status, data = cleaned_data)
+summary(anova_result)
+```
+
+
+## 2. Household Size and Economic Status
+
+```{r}
+# Contingency table for household size and economic status
+table_household_economic <- table(cleaned_data$household_size, cleaned_data$economic_status)
+print(table_household_economic)
+
+# Chi-square test for association between household size and economic status
+chisq_test <- chisq.test(table_household_economic)
+chisq_test
+
+# Visualization: Bar plot of household size vs economic status
+ggplot(cleaned_data, aes(x = as.factor(household_size), fill = economic_status)) +
+  geom_bar(position = "fill") +
+  labs(title = "Proportion of Economic Status by Household Size", x = "Household Size", y = "Proportion") +
+  theme_minimal()
+```
+
+
+## 3. Regional Disparities in Socioeconomic Indicators
+
+```{r}
+# Boxplot to compare income across regions
+ggplot(cleaned_data, aes(x = region_name, y = income, fill = region_name)) +
+  geom_boxplot() +
+  labs(title = "Income Distribution by Region", x = "Region", y = "Income") +
+  theme_minimal()
+
+# ANOVA test to check for regional differences in income
+anova_region <- aov(income ~ region_name, data = cleaned_data)
+summary(anova_region)
+
+# Bar plot of economic status proportions by region
+ggplot(cleaned_data, aes(x = region_name, fill = economic_status)) +
+  geom_bar(position = "fill") +
+  labs(title = "Proportion of Economic Status by Region", x = "Region", y = "Proportion") +
+  theme_minimal()
+```
+
+
+## 4. Age and Economic Outcomes
+
+```{r}
+# Scatterplot to visualize the relationship between age and income
+ggplot(cleaned_data, aes(x = age_years, y = income)) +
+  geom_point(alpha = 0.5) +
+  geom_smooth(method = "lm", color = "blue") +
+  labs(title = "Relationship Between Age and Income", x = "Age (Years)", y = "Income") +
+  theme_minimal()
+
+# Group individuals into age categories and analyze trends
+cleaned_data <- cleaned_data %>%
+  mutate(age_group = cut(age_years, breaks=c(0, 30, 50, Inf), labels=c("Young Adult", "Middle-aged", "Senior")))
+
+# Boxplot of income by age group
+ggplot(cleaned_data, aes(x = age_group, y = income, fill = age_group)) +
+  geom_boxplot() +
+  labs(title = "Income Distribution by Age Group", x = "Age Group", y = "Income") +
+  theme_minimal()
+
+# ANOVA test to check for differences in income across age groups
+anova_age <- aov(income ~ age_group, data = cleaned_data)
+summary(anova_age)
+```
+
+
+## 5. Interaction Effects Between Employment Status and Region
+
+```{r}
+# Convert employment_status to a factor
+cleaned_data$employment_status <- as.factor(cleaned_data$employment_status)
+
+# Check the structure of the data to confirm the change
+str(cleaned_data)
+
+# Fit a linear model with interaction terms
+interaction_model <- lm(income ~ employment_status * region_name, data = cleaned_data)
+
+# Plot interaction effects using sjPlot
+plot_model(interaction_model, type = "pred", terms = c("employment_status", "region_name")) +
+  labs(title = "Interaction Between Employment Status and Region", 
+       x = "Employment Status", 
+       y = "Predicted Income") +
+  theme_minimal()
+```
+
+```{r}
+# Fit a linear model with interaction terms
+interaction_model <- lm(income ~ employment_status * region_name, data = cleaned_data)
+
+# Plot interaction effects using interactions package
+interact_plot(interaction_model, pred = employment_status, modx = region_name) +
+  labs(title = "Interaction Between Employment Status and Region",
+       x = "Employment Status",
+       y = "Predicted Income") +
+  theme_minimal()
+```
+
+
+
+
+
