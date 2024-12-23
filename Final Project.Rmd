@@ -277,7 +277,7 @@ For each independent variable, we will plot its relationship with the dependent 
 
 #### Main Income Earner vs. Old Age Benefits: Boxplot to see the distribution of old-age benefits for different income earner statuses.
 
-```{r}
+```{r, fig.align='center'}
 # Main Income Earner vs Old Age Benefits (Boxplot)
 ggplot(cleaned_data, aes(x = main_income_earner, y = old_age_benefits)) +
   geom_boxplot(fill = "skyblue", color = "black", alpha = 0.7) +
@@ -307,7 +307,7 @@ The analysis of old age benefits by employment status reveals that a large propo
 
 
 #### Economic Status vs. Old Age Benefits: Boxplot to show the distribution of old-age benefits across economic statuses.
-```{r}
+```{r, fig.align='center'}
 # Economic Status vs Old Age Benefits (Boxplot)
 ggplot(cleaned_data, aes(x = economic_status, y = old_age_benefits)) +
   geom_boxplot(fill = "salmon", color = "black", alpha = 0.7) +
@@ -337,7 +337,7 @@ The boxplot and summary of Old Age Benefits by Economic Status reveal considerab
 
 
 #### Household Size vs. Old Age Benefits: Scatter plot to show how household size affects old-age benefits.
-```{r}
+```{r, fig.align='center'}
 # Household Size vs Old Age Benefits (Scatter plot)
 ggplot(cleaned_data, aes(x = household_size, y = old_age_benefits)) +
   geom_point(color = "darkred", alpha = 0.5) +
@@ -374,7 +374,7 @@ The correlation coefficient of `r round(correlation, 3)` further confirms the we
 #### Age vs. Old Age Benefits: Scatter plot to show the relationship between age and old-age benefits.
 
 
-```{r}
+```{r, fig.align='center'}
 # Age vs Old Age Benefits (Scatter plot)
 ggplot(cleaned_data, aes(x = age_years, y = old_age_benefits)) +
   geom_point(color = "blue", alpha = 0.5) +
@@ -391,117 +391,67 @@ The scatter plot of Age vs. Old Age Benefits suggests a moderate positive correl
 
 
 
-## 2. Household Size and Economic Status
+### 3. Joint influences of all possible pairs of predictors on the response to show possible interactions
 
-```{r}
-# Contingency table for household size and economic status
-table_household_economic <- table(cleaned_data$household_size, cleaned_data$economic_status)
-print(table_household_economic)
+#### Main Income Earner and Economic Status (Boxplot)
 
-# Chi-square test for association between household size and economic status
-chisq_test <- chisq.test(table_household_economic)
-chisq_test
+```{r, fig.align='center'}
+# Subset data for False Main Income Earners
+false_income_data <- cleaned_data[cleaned_data$main_income_earner == FALSE, ]
 
-# Visualization: Bar plot of household size vs economic status
-ggplot(cleaned_data, aes(x = as.factor(household_size), fill = economic_status)) +
-  geom_bar(position = "fill") +
-  labs(title = "Proportion of Economic Status by Household Size", x = "Household Size", y = "Proportion") +
-  theme_minimal()
+# Subset data for True Main Income Earners
+true_income_data <- cleaned_data[cleaned_data$main_income_earner == TRUE, ]
+
+# Plot for False Main Income Earners
+ggplot(false_income_data, aes(x = economic_status, y = old_age_benefits)) +
+  geom_boxplot(fill = "lightblue", color = "black", alpha = 0.7) +
+  labs(title = "Old Age Benefits by economic status for non-main income earners", 
+       x = "Economic Status", y = "Old Age Benefits (€)") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) # Rotate x labels for better readability
+
+# Plot for True Main Income Earners
+ggplot(true_income_data, aes(x = economic_status, y = old_age_benefits)) +
+  geom_boxplot(fill = "lightcoral", color = "black", alpha = 0.7) +
+  labs(title = "Old Age Benefits for main Income Earners by Economic Status", 
+       x = "Economic Status", y = "Old Age Benefits (€)") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) # Rotate x labels for better readability
+
 ```
 
-
-## 3. Regional Disparities in Socioeconomic Indicators
-
-```{r}
-# Boxplot to compare old_age_benefits across regions
-ggplot(cleaned_data, aes(x = region_name, y = old_age_benefits, fill = region_name)) +
-  geom_boxplot() +
-  labs(title = "old_age_benefits Distribution by Region", x = "Region", y = "old_age_benefits") +
-  theme_minimal()
-
-# ANOVA test to check for regional differences in old_age_benefits
-anova_region <- aov(old_age_benefits ~ region_name, data = cleaned_data)
-summary(anova_region)
-
-# Bar plot of economic status proportions by region
-ggplot(cleaned_data, aes(x = region_name, fill = economic_status)) +
-  geom_bar(position = "fill") +
-  labs(title = "Proportion of Economic Status by Region", x = "Region", y = "Proportion") +
-  theme_minimal()
-```
-
-
-## 4. Age and Economic Outcomes
-
-```{r}
-# Scatterplot to visualize the relationship between age and old_age_benefits
-ggplot(cleaned_data, aes(x = age_years, y = old_age_benefits)) +
-  geom_point(alpha = 0.5) +
-  geom_smooth(method = "lm", color = "blue") +
-  labs(title = "Relationship Between Age and old_age_benefits", x = "Age (Years)", y = "old_age_benefits") +
-  theme_minimal()
-
-# Group individuals into age categories and analyze trends
-cleaned_data <- cleaned_data %>%
-  mutate(age_group = cut(age_years, breaks=c(0, 30, 50, Inf), labels=c("Young Adult", "Middle-aged", "Senior")))
-
-# Boxplot of old_age_benefits by age group
-ggplot(cleaned_data, aes(x = age_group, y = old_age_benefits, fill = age_group)) +
-  geom_boxplot() +
-  labs(title = "old_age_benefits Distribution by Age Group", x = "Age Group", y = "old_age_benefits") +
-  theme_minimal()
-
-# ANOVA test to check for differences in old_age_benefits across age groups
-anova_age <- aov(old_age_benefits ~ age_group, data = cleaned_data)
-summary(anova_age)
-```
-
-
-## 5. Interaction Effects Between Employment Status and Region
-
-```{r}
-# Convert main_income_earner to a factor
-cleaned_data$main_income_earner <- as.factor(cleaned_data$main_income_earner)
-
-# Check the structure of the data to confirm the change
-str(cleaned_data)
-
-# Fit a linear model with interaction terms
-interaction_model <- lm(old_age_benefits ~ main_income_earner * region_name, data = cleaned_data)
-
-# Plot interaction effects using sjPlot
-plot_model(interaction_model, type = "pred", terms = c("main_income_earner", "region_name")) +
-  labs(title = "Interaction Between Employment Status and Region", 
-       x = "Employment Status", 
-       y = "Predicted old_age_benefits") +
-  theme_minimal()
-```
-
-```{r}
-# Fit a linear model with interaction terms
-interaction_model <- lm(old_age_benefits ~ main_income_earner * region_name, data = cleaned_data)
-
-# Plot interaction effects using interactions package
-interact_plot(interaction_model, pred = main_income_earner, modx = region_name) +
-  labs(title = "Interaction Between Employment Status and Region",
-       x = "Employment Status",
-       y = "Predicted old_age_benefits") +
-  theme_minimal()
-```
+These two plots show the joint influence of economic status and whether participants are the main income earners of the household. Similar to the Bivariate analysis of these variables it is visible that economic status seems to have a larger impact with the retired status being the only one that shows median values for old age benefits that are larger than zero. This is the case for both, main and non-main income earners which could mean, that being the mean income earner has no influence on the amount of old age benefits.
 
 
 ```{r}
+# Plot using facet_wrap() for better organization
+ggplot(cleaned_data, aes(x = factor(household_size), y = old_age_benefits)) +
+  geom_boxplot(fill = "lightgreen", color = "black", alpha = 0.7) +
+  labs(title = "Old Age Benefits by Household Size and Economic Status", 
+       x = "Household Size", y = "Old Age Benefits (€)") +
+  facet_wrap(~ economic_status, scales = "free_y") + # Create separate plots for each economic status
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) # Rotate x labels for readability
 
 
-# T-test to compare the means of Old Age Benefits between the two groups
-t_test_result <- t.test(old_age_benefits ~ main_income_earner, data = cleaned_data)
-print(t_test_result)
-
-# If assumptions for t-test are not met, you can use a Wilcoxon test
-wilcox_test_result <- wilcox.test(old_age_benefits ~ main_income_earner, data = cleaned_data)
-print(wilcox_test_result)
 
 ```
+
+These Facet-based Plots show that for all economic status apart from Retired, FT_Work and Domestic almost no surveyants earn old age benefits that are not equal to 0€. For the economic status FT_Work and Domestic a large number of outliers show participants that earn non zero amounts of old age benefits. The one plot that allows us to interpret further is the one showing the economic status Retired. On this boxplot it is visible that across all household sizes the median old age benefits remain fairly similar. The number of outliers is higher for smaller households, which could be because most participants are in households with 1-3 inhabitants.
+
+```{r}
+# Heatmap for Age and Economic Status vs Old Age Benefits
+ggplot(cleaned_data, aes(x = age_years, y = economic_status, fill = old_age_benefits)) +
+  geom_tile() +
+  labs(title = "Heatmap: Old Age Benefits by Age and Economic Status", 
+       x = "Age (years)", y = "Economic Status", fill = "Old Age Benefits (€)") +
+  theme_minimal() +
+  scale_fill_gradient(low = "lightblue", high = "darkred") + # Color scale for benefits
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) # Rotate x-axis labels
+
+```
+
+This heatmap shows the joint influence of age and economic status on the amount of old age benefits received by participants. Similar to the previous plots it is visible, that the economic status Retired shows the highest number of non-0€ old age benefit earners. Meanwhile most other status show hardly any participants that receive old age benefits. Another thing that can be seen here is the relationship between age and economic status with almost no students above the age of 35 and almost no retirees below 35 years of age.
 
 
 
