@@ -1,14 +1,38 @@
 ---
 title: "STCO - Project"
-author: "Group 6: Johannes Gölles, Kevin Andoni"
+author: 'Group 6: Johannes Gölles, Kevin Andoni'
 date: "2024-12-06"
-output: html_document
+output:
+  pdf_document: default
+  html_document: default
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
+# Introduction
+
+The European Union Statistics on Income and Living Conditions (EU-SILC) dataset provides a valuable perspective on socioeconomic factors such as income, household composition, and employment status. This analysis focuses on the East Austria regions (Vienna, Lower Austria, and Burgenland) to investigate the determinants of **py100n**, which serves as the dependent variable.
+
+The **py100n** variable represents net old-age benefits, which include:
+
+Old-age pensions: Periodic payments to maintain income after retirement.
+Anticipated pensions: Early retirement benefits, with or without reduced payments.
+Partial pensions: Payments for older workers reducing work hours.
+Care allowances: Payments for individuals needing frequent assistance.
+Lump-sum payments: One-time retirement benefits.
+Other cash benefits: Miscellaneous old-age-related financial supports.
+
+Key predictors considered in this study include:
+
+Main Income Earner Status (main): Indicates whether an individual is the main income earner of their household.
+
+Economic Status (ecoStat): Represents the individual's primary economic activity (e.g., full-time work, retired).
+
+Household Size (hsize): The number of individuals in a household.
+
+Age (age): The respondent's age in years.
 
 ```{r}
 # List of required packages
@@ -24,6 +48,14 @@ invisible(lapply(packages, function(pkg) {
   })
 }))
 ```
+
+## Data Collection
+
+The data for this analysis comes from the **European Union Statistics on Income and Living Conditions (EU-SILC)** survey. The EU-SILC is a large-scale cross-sectional and longitudinal survey conducted annually across European Union member states. It provides harmonized data on income, living conditions, poverty, and social exclusion. For this analysis, data from the East Austria regions—Vienna, Lower Austria, and Burgenland—was extracted.
+
+### Type of Survey and Execution
+
+The EU-SILC is conducted as a household survey, combining personal interviews and administrative data. It gathers socioeconomic information at both the household and individual levels. The survey period typically spans a calendar year, ensuring comprehensive coverage of annual income and employment data.
 
 
 ```{r}
@@ -44,26 +76,30 @@ subset_data <- subset(
 subset_data$region <- droplevels(subset_data$region)
 
 # View a summary of the subset data
-head(subset_data)
+#print(str(subset_data))
+
+
 ```
+
+
+
+
+
+
 
 
 ```{r}
 # Rename columns for clarity
 cleaned_data <- subset_data %>%
   rename(
-    income = py100n,
-    employment_status = main,
+    old_age_benefits = py100n,
+    main_income_earner = main,
     economic_status = ecoStat,
     household_size = hsize,
     age_years = age,
     region_name = region
   )
-```
 
-
-```{r}
-# Option 1: Remove rows with any missing values
 cleaned_data <- cleaned_data %>% na.omit() # We lose ~4000 rows
 
 # Replace numeric levels of economic_status with abbreviations
@@ -79,95 +115,280 @@ cleaned_data$economic_status <- factor(cleaned_data$economic_status,
                                          "Domestic"    # Domestic Tasks/Care Responsibilities
                                        ))
 
-# Check the updated levels of economic_status
-levels(cleaned_data$economic_status)
-
-print(head(cleaned_data))
+cleaned_data$household_size <- as.numeric(as.character(cleaned_data$household_size))
 
 ```
 
-```{r}
-# Reclassify economic_status for inconsistent rows and preserve factor levels
-cleaned_data <- cleaned_data %>%
-  mutate(economic_status = ifelse((economic_status %in% c("FT_Work", "PT_Work")) & 
-                                  employment_status == FALSE & 
-                                  income == 0, 
-                                  "Unemployed", 
-                                  as.character(economic_status))) %>%
-  mutate(economic_status = factor(economic_status, 
-                                  levels = c("FT_Work", "PT_Work", "Unemployed", 
-                                             "Student", "Retired", "Disabled", "Domestic")))
-print(head(cleaned_data))
-```
+
+
+### Data Preparation
+
+To prepare the data for analysis:
+
+1. **Subsetting**: Only observations from the regions of Vienna, Lower Austria, and Burgenland were retained.
+2. **Variable Renaming**: Variable names were simplified for clarity:
+   - `py100n` → `old_age_benefits`
+   - `main` → `main_income_earner`
+   - `ecoStat` → `economic_status`
+   - `hsize` → `household_size`
+   - `age` → `age_years`
+   - `region` → `region_name`
+3. **Missing Value Treatment**: Rows with missing values were removed using the `na.omit()` function, resulting in a loss of approximately 4,000 rows.
+4. **Factor Level Adjustments**: Categorical variables were recoded to ensure consistent levels:
+   - Factor levels of `region` were adjusted to include only the specified East Austria regions.
+   - Household_size which was a categorical variable was changed to numerical data
+5. **Reclassification**: Certain inconsistencies were identified and addressed.
+
+
+The cleaned dataset is now ready for descriptive and inferential analysis. Below is a summary of the data preparation process:
+
 
 ```{r}
-# Check updated levels of economic_status
-levels(cleaned_data$economic_status)
-
 # View summary of cleaned_data
 summary(cleaned_data)
 ```
 
+### Summary of the Cleaned Dataset
 
-## Investigate Inconsistencies
+The cleaned dataset contains a detailed overview of individual-level and household-level variables for respondents from the East Austria regions. Below is a description of the key variables:
 
-```{r}
-# Identify inconsistent rows
-inconsistent_rows <- cleaned_data %>%
-  filter((economic_status %in% c("FT_Work", "PT_Work")) & 
-         employment_status == FALSE & 
-         income == 0)
+- **Economic Status (`economic_status`)**:  
+  Respondents are categorized into seven groups based on their primary economic activity:
+  - "FT_Work" (Full-time Work): **9,116 individuals**.
+  - "PT_Work" (Part-time Work): **1,718 individuals**.
+  - "Unemployed": **1,314 individuals**.
+  - "Student" (includes unpaid work experience or in compulsory military or community service): **1,295 individuals**.
+  - "Retired": **5,427 individuals**.
+  - "Disabled": **191 individuals**.
+  - "Domestic" (engaged in household activities): **1,643 individuals**.
 
-# View inconsistent rows
-print(inconsistent_rows)
+- **Old age benefits (`old_age_benefits`)**:  
+  Old age benefit values exhibit high skewness, with most respondents reporting **0 old age benefits**, as evident from the median and third quartile values.  
+  - Minimum old_age_benefits: **€0**.  
+  - Maximum old_age_benefits: **€101,777**.  
+  - Mean old_age_benefits: **€3,864**, affected by a few persons with high old age benefits.  
+
+- **Main income earner (`main_income_earner`)**:  
+  A binary indicator of employment shows that **11,275 individuals** are the main income earner of their household (`TRUE`), while **9,429 individuals** are not living in a household where another person is the main income earner (`FALSE`).
+
+- **Household Size (`household_size`)**:  
+  The number of individuals in a household ranges from **1 to 6**, with most households consisting of:
+  - **2 members (6,211 households)**.
+  - **3 members (4,410 households)**.
+  - **1 member (4,384 households)**.
+  Which explains the median of 2 and the mean of 2.708 individuals per household. The smallest households were single person households and the most people in a household mentioned in this survey were 8 individuals.
+
+- **Age (`age_years`)**:  
+  Respondent ages range from **16 to 96 years**, with:  
+  - Median age: **44 years**.  
+  - Mean age: **46.18 years**, indicating a slightly older sample.  
+  - The interquartile range is from **32 to 60 years**.  
+
+- **Region (`region_name`)**:  
+  The dataset includes observations from three regions in East Austria:  
+  - **Burgenland**: **1,690 individuals**.  
+  - **Lower Austria**: **9,313 individuals**.  
+  - **Vienna**: **9,701 individuals**.
+
+This summary highlights differences across key variables, providing a foundation for exploring their relationships in subsequent analyses.
+
+
+## Descriptive Analysis of the Sample
+
+In this section, we will explore the key features of the data through various descriptive statistics and visualizations. These analyses will help us understand the distribution and relationships between variables, as well as identify any patterns or outliers.
+
+### Age (`age_years`)
+The age distribution of respondents is visualized below. The summary statistics highlight a slightly older sample, with most individuals aged between 30 and 60.
+
+```{r age_histogram, echo=TRUE, fig.align="center"}
+# Histogram for age
+library(ggplot2)
+ggplot(data = cleaned_data, aes(x = age_years)) +
+  geom_histogram(binwidth = 5, fill = "steelblue", color = "black") +
+  labs(title = "Distribution of Respondents' Age", x = "Age (Years)", y = "Frequency") +
+  theme_minimal()
 ```
 
+The histogram shows a concentration of respondents between 30 and 60 years old. A noticeable decline occurs after age 65, reflecting a reduced representation of older individuals in the dataset.
 
-## Reclassify Economic Status
+### 1. Univariate Analysis
+
+#### Old age benefits Distribution
+The first variable we will explore is **old_age_benefits**. We will visualize its distribution to check for any skewness and identify outliers.
 
 ```{r}
-# Reclassify economic_status for inconsistent rows
-cleaned_data <- cleaned_data %>%
-  mutate(economic_status = ifelse((economic_status %in% c("FT_Work", "PT_Work")) & 
-                                  employment_status == FALSE & 
-                                  income == 0, 
-                                  "Unemployed", 
-                                  economic_status))
-print(head(cleaned_data))
-
+# Plot histogram of old_age_benefits distribution
+ggplot(cleaned_data, aes(x = old_age_benefits)) +
+  geom_histogram(binwidth = 1000, fill = "skyblue", color = "black", alpha = 0.7) +
+  labs(title = "Old age benefits Distribution", x = "Old age benefits", y = "Frequency") +
+  theme_minimal()
 ```
 
+The histogram of old-age benefits shows a zero-inflated distribution, with the majority of respondents receiving €0 old-age benefits. This is indicated by a clear peak at 0. This could be because generally individuals in Austria start to receive old age benefits after already working a substantial number of years or reaching certain age threshholds.
 
+As the old-age benefits increase, the number of respondents receiving those benefits sharply decreases, suggesting that only a few individuals receive high amounts of old-age benefits, with outliers reaching up to €101,777.
 
-
-```{r}
-# Option 2: Alternatively, impute missing values (e.g., median for numeric variables)
-# cleaned_data <- cleaned_data %>%
-#   mutate(
-#     income = ifelse(is.na(income), median(income, na.rm = TRUE), income),
-#     household_size = ifelse(is.na(household_size), median(household_size, na.rm = TRUE), household_size),
-#     age_years = ifelse(is.na(age_years), median(age_years, na.rm = TRUE), age_years)
-#   )
-
-# View a summary of the cleaned data
-# cleaned_data
-```
-
-
-
-## 1. Impact of Employment Status on Income
+This distribution is highly skewed to the right, with the bulk of the data clustered around 0, which should be acknowledged when interpreting the relationship between old-age benefits and the predictors.
 
 ```{r}
-# Boxplot to visualize income distribution by employment status
-ggplot(cleaned_data, aes(x = employment_status, y = income, fill = employment_status)) +
-  geom_boxplot() +
-  labs(title = "Income Distribution by Employment Status", x = "Employment Status", y = "Income") +
+# Employment Status (Bar plot with percentage)
+ggplot(cleaned_data, aes(x = main_income_earner)) +
+  geom_bar(aes(y = (after_stat(count))/sum(after_stat(count))), fill = "lightgreen", color = "black", alpha = 0.7) +
+  scale_y_continuous(labels = scales::percent) +  # Format y-axis as percentage
+  labs(title = "Main Income Earner Distribution", x = "Is Main Income Earner", y = "Percentage") +
   theme_minimal()
 
-# ANOVA test to check for significant differences in income across employment statuses
-anova_result <- aov(income ~ employment_status, data = cleaned_data)
-summary(anova_result)
 ```
+This simple barplot shows that arount 55% of participants are the main income earners of their households.
+
+```{r}
+# Economic Status (Bar plot)
+ggplot(cleaned_data, aes(x = economic_status)) +
+  geom_bar(fill = "salmon", color = "black", alpha = 0.7) +
+  labs(title = "Economic Status Distribution", x = "Economic Status", y = "Count") +
+  theme_minimal()
+
+
+```
+
+The previous barplot clearly shows that the biggest part of surveyants are working full time, the second largest group are retirees followed by individuals fulfilling domestic tasks and care responsibilities. The number of people that are working part time, are unemployed or studying each make up a similar share of the dataset. The lowest number of participants are either permanently disabled or/and unfit to work.
+```{r}
+# Household Size (Histogram)
+ggplot(cleaned_data, aes(x = household_size)) +
+  geom_histogram(binwidth = 1, fill = "lightcoral", color = "black", alpha = 0.7) +
+  labs(title = "Household Size Distribution", x = "Household Size", y = "Count") +
+  theme_minimal()
+```
+
+The household size distribution in the dataset is right-skewed, with the majority of households consisting of 1 to 4 members. The most common household size is 2 members, followed by 3 and 1 member households. As household size increases, the frequency rapidly decreases, with very few households having 5 or more members. This results in a long tail on the right side, indicating that while smaller households are more frequent, larger households are much less common.
+
+```{r}
+# Age (Histogram)
+ggplot(cleaned_data, aes(x = age_years)) +
+  geom_histogram(binwidth = 5, fill = "lightyellow", color = "black", alpha = 0.7) +
+  labs(title = "Age Distribution", x = "Age (years)", y = "Count") +
+  theme_minimal()
+```
+
+The age distribution in the dataset ranges from 16 to 96 years, with a mean age of 46.18 years and a median age of 44, indicating a slightly older sample. The majority of respondents fall within the interquartile range of 32 to 60 years. The distribution is relatively balanced, with a few older individuals contributing to the higher mean. Overall, the dataset represents a wide age range, with the most common ages clustered in the mid-adult range.
+
+### 2. Bivariate Relationships Between Predictors and Response Variable
+For each independent variable, we will plot its relationship with the dependent variable (old_age_benefits). Since old_age_benefits is numeric, we can use scatter plots for numeric variables and boxplots for categorical variables.
+
+#### Main Income Earner vs. Old Age Benefits: Boxplot to see the distribution of old-age benefits for different income earner statuses.
+
+```{r}
+# Main Income Earner vs Old Age Benefits (Boxplot)
+ggplot(cleaned_data, aes(x = main_income_earner, y = old_age_benefits)) +
+  geom_boxplot(fill = "skyblue", color = "black", alpha = 0.7) +
+  labs(title = "Old Age Benefits by Employment Status", x = "Is main income earner", y = "Old Age Benefits (€)") +
+  theme_minimal()
+```
+```{r}
+# Summary statistics for Old Age Benefits by Main Income Earner status
+summary_stats <- cleaned_data %>%
+  group_by(main_income_earner) %>%
+  summarise(
+    mean_benefits = mean(old_age_benefits, na.rm = TRUE),
+    median_benefits = median(old_age_benefits, na.rm = TRUE),
+    Q1_benefits = quantile(old_age_benefits, 0.25, na.rm = TRUE),
+    Q3_benefits = quantile(old_age_benefits, 0.75, na.rm = TRUE),
+    IQR_benefits = IQR(old_age_benefits, na.rm = TRUE),
+    min_benefits = min(old_age_benefits, na.rm = TRUE),
+    max_benefits = max(old_age_benefits, na.rm = TRUE)
+  )
+
+# Display the summary statistics
+print(summary_stats)
+```
+
+
+The analysis of old age benefits by employment status reveals that a large proportion of both main income earners and non-main income earners receive no benefits, as indicated by the median values of 0 for both groups. However, the mean old age benefits are significantly higher for main income earners (€5422.25) compared to non-main income earners (€1999.67), suggesting that individuals who are the primary income earners tend to receive greater benefits. The interquartile range (IQR) and maximum values are also higher for main income earners, indicating a wider spread of benefits within this group. Despite these differences, the overall distribution for both groups is heavily skewed toward 0 benefits, with only a small subset of individuals receiving substantial amounts.
+
+
+#### Economic Status vs. Old Age Benefits: Boxplot to show the distribution of old-age benefits across economic statuses.
+```{r}
+# Economic Status vs Old Age Benefits (Boxplot)
+ggplot(cleaned_data, aes(x = economic_status, y = old_age_benefits)) +
+  geom_boxplot(fill = "salmon", color = "black", alpha = 0.7) +
+  labs(title = "Old Age Benefits by Economic Status", x = "Economic Status", y = "Old Age Benefits (€)") +
+  theme_minimal()
+```
+```{r}
+# Summarizing old age benefits by economic status
+summary_stats2 <- cleaned_data %>%
+  group_by(economic_status) %>%
+  summarise(
+    mean_benefits = mean(old_age_benefits, na.rm = TRUE),
+    median_benefits = median(old_age_benefits, na.rm = TRUE),
+    Q1_benefits = quantile(old_age_benefits, 0.25, na.rm = TRUE),
+    Q3_benefits = quantile(old_age_benefits, 0.75, na.rm = TRUE),
+    IQR_benefits = IQR(old_age_benefits, na.rm = TRUE),
+    min_benefits = min(old_age_benefits, na.rm = TRUE),
+    max_benefits = max(old_age_benefits, na.rm = TRUE)
+  )
+
+# View the summary statistics
+print(summary_stats2)
+```
+
+
+The boxplot and summary of Old Age Benefits by Economic Status reveal considerable differences in the distribution of benefits across various economic status categories. For most groups, the median benefits are 0, indicating that a large portion of individuals in these categories receive no old age benefits. However, certain groups, such as "Retired" and "Disabled," show a wider range of benefits, with some individuals receiving notably higher benefits (reflected by the spread and presence of outliers). The "FT_Work" and "PT_Work" categories show tighter distributions, with the majority of individuals receiving no benefits. The plot highlights that while many individuals across economic status groups do not receive any benefits, there are distinct differences in the variability and higher benefits for certain groups, particularly those who are retired or disabled.
+
+
+#### Household Size vs. Old Age Benefits: Scatter plot to show how household size affects old-age benefits.
+```{r}
+# Household Size vs Old Age Benefits (Scatter plot)
+ggplot(cleaned_data, aes(x = household_size, y = old_age_benefits)) +
+  geom_point(color = "darkred", alpha = 0.5) +
+  labs(title = "Old Age Benefits by Household Size", x = "Household Size", y = "Old Age Benefits (€)") +
+  theme_minimal()
+```
+
+```{r}
+# Summary statistics for Old Age Benefits by Household Size
+summary_stats_household <- cleaned_data %>%
+  group_by(household_size) %>%
+  summarise(
+    mean_benefits = mean(old_age_benefits, na.rm = TRUE),
+    median_benefits = median(old_age_benefits, na.rm = TRUE),
+    Q1_benefits = quantile(old_age_benefits, 0.25, na.rm = TRUE),
+    Q3_benefits = quantile(old_age_benefits, 0.75, na.rm = TRUE),
+    IQR_benefits = IQR(old_age_benefits, na.rm = TRUE),
+    min_benefits = min(old_age_benefits, na.rm = TRUE),
+    max_benefits = max(old_age_benefits, na.rm = TRUE)
+  )
+
+# View the summary statistics by Household Size
+print(summary_stats_household)
+
+# Correlation between Household Size and Old Age Benefits
+correlation <- cor(cleaned_data$household_size, cleaned_data$old_age_benefits, use = "complete.obs")
+
+```
+
+The scatter plot depicting household size versus old age benefits reveals a weak negative trend, where households with smaller sizes tend to have higher old age benefits, and larger households tend to have lower benefits. Although there is a general decline in benefits as household size increases, the plot also shows considerable variability within each household size category. Many data points cluster at the lower end of the old age benefits scale, indicating that a significant proportion of individuals, regardless of household size, do not receive old age benefits. 
+
+The correlation coefficient of `r round(correlation, 3)` further confirms the weak inverse relationship between household_size and old_age_benefits, suggesting that as household size increases, the old age benefits decrease slightly on average.
+
+#### Age vs. Old Age Benefits: Scatter plot to show the relationship between age and old-age benefits.
+
+
+```{r}
+# Age vs Old Age Benefits (Scatter plot)
+ggplot(cleaned_data, aes(x = age_years, y = old_age_benefits)) +
+  geom_point(color = "blue", alpha = 0.5) +
+  labs(title = "Old Age Benefits by Age", x = "Age (years)", y = "Old Age Benefits (€)") +
+  theme_minimal()
+
+# Calculate correlation between Age and Old Age Benefits
+cor_age_benefits <- cor(cleaned_data$age_years, cleaned_data$old_age_benefits, use = "complete.obs")
+```
+
+The scatter plot of Age vs. Old Age Benefits suggests a moderate positive correlation, with older individuals generally receiving higher old age benefits, although there is significant variability. The correlation coefficient between Age and Old Age Benefits is `r round(cor_age_benefits, 3)`, indicating a moderate positive relationship. Despite this, the plot reveals some outliers and wide variability in the benefits received across different age groups.
+
+
+
 
 
 ## 2. Household Size and Economic Status
@@ -192,14 +413,14 @@ ggplot(cleaned_data, aes(x = as.factor(household_size), fill = economic_status))
 ## 3. Regional Disparities in Socioeconomic Indicators
 
 ```{r}
-# Boxplot to compare income across regions
-ggplot(cleaned_data, aes(x = region_name, y = income, fill = region_name)) +
+# Boxplot to compare old_age_benefits across regions
+ggplot(cleaned_data, aes(x = region_name, y = old_age_benefits, fill = region_name)) +
   geom_boxplot() +
-  labs(title = "Income Distribution by Region", x = "Region", y = "Income") +
+  labs(title = "old_age_benefits Distribution by Region", x = "Region", y = "old_age_benefits") +
   theme_minimal()
 
-# ANOVA test to check for regional differences in income
-anova_region <- aov(income ~ region_name, data = cleaned_data)
+# ANOVA test to check for regional differences in old_age_benefits
+anova_region <- aov(old_age_benefits ~ region_name, data = cleaned_data)
 summary(anova_region)
 
 # Bar plot of economic status proportions by region
@@ -213,25 +434,25 @@ ggplot(cleaned_data, aes(x = region_name, fill = economic_status)) +
 ## 4. Age and Economic Outcomes
 
 ```{r}
-# Scatterplot to visualize the relationship between age and income
-ggplot(cleaned_data, aes(x = age_years, y = income)) +
+# Scatterplot to visualize the relationship between age and old_age_benefits
+ggplot(cleaned_data, aes(x = age_years, y = old_age_benefits)) +
   geom_point(alpha = 0.5) +
   geom_smooth(method = "lm", color = "blue") +
-  labs(title = "Relationship Between Age and Income", x = "Age (Years)", y = "Income") +
+  labs(title = "Relationship Between Age and old_age_benefits", x = "Age (Years)", y = "old_age_benefits") +
   theme_minimal()
 
 # Group individuals into age categories and analyze trends
 cleaned_data <- cleaned_data %>%
   mutate(age_group = cut(age_years, breaks=c(0, 30, 50, Inf), labels=c("Young Adult", "Middle-aged", "Senior")))
 
-# Boxplot of income by age group
-ggplot(cleaned_data, aes(x = age_group, y = income, fill = age_group)) +
+# Boxplot of old_age_benefits by age group
+ggplot(cleaned_data, aes(x = age_group, y = old_age_benefits, fill = age_group)) +
   geom_boxplot() +
-  labs(title = "Income Distribution by Age Group", x = "Age Group", y = "Income") +
+  labs(title = "old_age_benefits Distribution by Age Group", x = "Age Group", y = "old_age_benefits") +
   theme_minimal()
 
-# ANOVA test to check for differences in income across age groups
-anova_age <- aov(income ~ age_group, data = cleaned_data)
+# ANOVA test to check for differences in old_age_benefits across age groups
+anova_age <- aov(old_age_benefits ~ age_group, data = cleaned_data)
 summary(anova_age)
 ```
 
@@ -239,36 +460,48 @@ summary(anova_age)
 ## 5. Interaction Effects Between Employment Status and Region
 
 ```{r}
-# Convert employment_status to a factor
-cleaned_data$employment_status <- as.factor(cleaned_data$employment_status)
+# Convert main_income_earner to a factor
+cleaned_data$main_income_earner <- as.factor(cleaned_data$main_income_earner)
 
 # Check the structure of the data to confirm the change
 str(cleaned_data)
 
 # Fit a linear model with interaction terms
-interaction_model <- lm(income ~ employment_status * region_name, data = cleaned_data)
+interaction_model <- lm(old_age_benefits ~ main_income_earner * region_name, data = cleaned_data)
 
 # Plot interaction effects using sjPlot
-plot_model(interaction_model, type = "pred", terms = c("employment_status", "region_name")) +
+plot_model(interaction_model, type = "pred", terms = c("main_income_earner", "region_name")) +
   labs(title = "Interaction Between Employment Status and Region", 
        x = "Employment Status", 
-       y = "Predicted Income") +
+       y = "Predicted old_age_benefits") +
   theme_minimal()
 ```
 
 ```{r}
 # Fit a linear model with interaction terms
-interaction_model <- lm(income ~ employment_status * region_name, data = cleaned_data)
+interaction_model <- lm(old_age_benefits ~ main_income_earner * region_name, data = cleaned_data)
 
 # Plot interaction effects using interactions package
-interact_plot(interaction_model, pred = employment_status, modx = region_name) +
+interact_plot(interaction_model, pred = main_income_earner, modx = region_name) +
   labs(title = "Interaction Between Employment Status and Region",
        x = "Employment Status",
-       y = "Predicted Income") +
+       y = "Predicted old_age_benefits") +
   theme_minimal()
 ```
 
 
+```{r}
+
+
+# T-test to compare the means of Old Age Benefits between the two groups
+t_test_result <- t.test(old_age_benefits ~ main_income_earner, data = cleaned_data)
+print(t_test_result)
+
+# If assumptions for t-test are not met, you can use a Wilcoxon test
+wilcox_test_result <- wilcox.test(old_age_benefits ~ main_income_earner, data = cleaned_data)
+print(wilcox_test_result)
+
+```
 
 
 
