@@ -71,6 +71,42 @@ library(interactions)
 
 The data for this analysis comes from the **European Union Statistics on Income and Living Conditions (EU-SILC)** survey. The EU-SILC is a large-scale cross-sectional and longitudinal survey conducted annually across European Union member states. It provides harmonized data on income, living conditions, poverty, and social exclusion. For this analysis, data from the East Austria regions—Vienna, Lower Austria, and Burgenland—was extracted.
 
+Below is a data dictionary summarizing the key variables used in this analysis:
+
+```{r}
+#| label: tbl-data-dictionary
+#| tbl-cap: "Data Dictionary for EU-SILC Dataset"
+#| echo: false
+#| code-fold: false
+
+# Create a data dictionary as a tibble
+data_dictionary <- tibble::tibble(
+  Variable = c(
+    "old_age_benefits", "main_income_earner", "economic_status", 
+    "household_size", "age_years", "region_name"
+  ),
+  Description = c(
+    "Net old-age benefits received by individuals, including pensions, care allowances, and other financial supports.",
+    "Indicates whether the individual is the main income earner of their household (TRUE/FALSE).",
+    "Primary economic activity of the individual (e.g., full-time work, retired, unemployed).",
+    "Number of individuals living in the respondent's household.",
+    "Age of the respondent in years.",
+    "Region where the respondent resides (Vienna, Lower Austria, or Burgenland)."
+  ),
+  Type = c(
+    "Numeric", "Logical", "Categorical", 
+    "Numeric", "Numeric", "Categorical"
+  )
+)
+
+# Display the data dictionary as a formatted table
+knitr::kable(data_dictionary, caption = "Data Dictionary for EU-SILC Dataset") |> 
+  kableExtra::kable_styling(full_width = FALSE, position = "center") |>
+  kableExtra::column_spec(2, width = "25em") # Adjust width of Description column
+```
+
+
+
 ### Type of Survey and Execution
 
 The EU-SILC is conducted as a household survey, combining personal interviews and administrative data. It gathers socioeconomic information at both the household and individual levels. The survey period typically spans a calendar year, ensuring comprehensive coverage of annual income and employment data.
@@ -98,6 +134,11 @@ print(str(subset_data))
 ```
 
 ### Data Cleaning
+
+To prepare the dataset for analysis, we renamed variables to make them more intuitive (e.g., py100n to old_age_benefits and ecoStat to economic_status) and removed rows with missing values, resulting in a loss of approximately 4,000 rows. This ensures the dataset is clean and reliable for analysis. Additionally, we recoded the numeric levels of economic_status into meaningful labels (e.g., 'FT_Work' for full-time work, 'Retired' for retired individuals) to improve interpretability, and converted household_size from categorical to numeric format to enable numerical comparisons in later analyses.
+
+Zero values in `old_age_benefits` represent individuals who do not receive any benefits. Including these zeros in regression analysis would distort the model by introducing unnecessary noise and biasing the results. By filtering out zeros, we focus on participants who receive benefits, enabling a more accurate understanding of the factors influencing benefit amounts.
+
 
 ```{r}
 #| code-fold: true
@@ -130,17 +171,50 @@ cleaned_data$economic_status <- factor(cleaned_data$economic_status,
 
 cleaned_data$household_size <- as.numeric(as.character(cleaned_data$household_size))
 
-```
-
-
-
-### Why we have to remove the values where old_age_benfits are 0€
-
-```{r}
 # Filter out zeros in old_age_benefits for regression analysis
 cleaned_data_no_zeros <- cleaned_data %>%
   filter(old_age_benefits > 0)
+
+# Summary of data cleaning steps
+cleaning_summary <- tibble::tibble(
+  Step = c("Original Dataset", "After Removing Missing Values", "After Filtering Zeros"),
+  Number_of_Rows = c(nrow(eusilcP), nrow(cleaned_data), nrow(cleaned_data_no_zeros))
+)
+
+# Display the summary table
+knitr::kable(cleaning_summary, caption = "Summary of Data Cleaning Steps") |>
+  kableExtra::kable_styling(full_width = FALSE, position = "center")
+
 ```
+
+```{r}
+# Compare distributions before and after cleaning
+summary_original <- subset_data %>%
+  summarize(
+    mean_age = mean(age, na.rm = TRUE),
+    prop_retired = mean(ecoStat == 5, na.rm = TRUE), # Example for retired individuals
+    prop_vienna = mean(region == "Vienna", na.rm = TRUE)
+  )
+
+summary_cleaned <- cleaned_data_no_zeros %>%
+  summarize(
+    mean_age = mean(age_years),
+    prop_retired = mean(economic_status == "Retired"),
+    prop_vienna = mean(region_name == "Vienna")
+  )
+
+# Combine summaries into a table for comparison
+comparison_summary <- bind_rows(
+  Original = summary_original,
+  Cleaned = summary_cleaned,
+  .id = "Dataset"
+)
+
+knitr::kable(comparison_summary, caption = "Comparison of Key Variables Before and After Cleaning") |>
+  kableExtra::kable_styling(full_width = FALSE, position = "center")
+
+```
+
 
 
 ### Data Preparation
@@ -213,6 +287,12 @@ The cleaned dataset contains a detailed overview of individual-level and househo
   - **Vienna**: **9,701 individuals**.
 
 This summary highlights differences across key variables, providing a foundation for exploring their relationships in subsequent analyses.
+
+
+### Research Question
+
+"This study aims to answer the following question: What factors influence the distribution of old-age benefits in East Austria, and how do these benefits vary across socioeconomic groups?"
+
 
 
 ## Descriptive Analysis of the Sample
@@ -370,7 +450,7 @@ ggplot(cleaned_data_no_zeros, aes(x = household_size, y = old_age_benefits)) +
 
 ```{r}
 # Summary statistics for Old Age Benefits by Household Size
-summary_stats_household <- cleaned_data %>%
+summary_stats_household <- cleaned_data_no_zeros %>%
   group_by(household_size) %>%
   summarise(
     mean_benefits = mean(old_age_benefits, na.rm = TRUE),
@@ -386,7 +466,7 @@ summary_stats_household <- cleaned_data %>%
 print(summary_stats_household)
 
 # Correlation between Household Size and Old Age Benefits
-correlation <- cor(cleaned_data$household_size, cleaned_data$old_age_benefits, use = "complete.obs")
+correlation <- cor(cleaned_data_no_zeros$household_size, cleaned_data_no_zeros$old_age_benefits, use = "complete.obs")
 
 ```
 
@@ -399,13 +479,13 @@ The correlation coefficient of `r round(correlation, 3)` further confirms the we
 
 ```{r, fig.align='center'}
 # Age vs Old Age Benefits (Scatter plot)
-ggplot(cleaned_data, aes(x = age_years, y = old_age_benefits)) +
+ggplot(cleaned_data_no_zeros, aes(x = age_years, y = old_age_benefits)) +
   geom_point(color = "blue", alpha = 0.5) +
   labs(title = "Old Age Benefits by Age", x = "Age (years)", y = "Old Age Benefits (€)") +
   theme_minimal()
 
 # Calculate correlation between Age and Old Age Benefits
-cor_age_benefits <- cor(cleaned_data$age_years, cleaned_data$old_age_benefits, use = "complete.obs")
+cor_age_benefits <- cor(cleaned_data_no_zeros$age_years, cleaned_data_no_zeros$old_age_benefits, use = "complete.obs")
 ```
 
 The scatter plot of Age vs. Old Age Benefits suggests a moderate positive correlation, with older individuals generally receiving higher old age benefits, although there is significant variability. The correlation coefficient between Age and Old Age Benefits is `r round(cor_age_benefits, 3)`, indicating a moderate positive relationship. Despite this, the plot reveals some outliers and wide variability in the benefits received across different age groups.
@@ -420,10 +500,10 @@ The scatter plot of Age vs. Old Age Benefits suggests a moderate positive correl
 
 ```{r, fig.align='center'}
 # Subset data for False Main Income Earners
-false_income_data <- cleaned_data[cleaned_data$main_income_earner == FALSE, ]
+false_income_data <- cleaned_data_no_zeros[cleaned_data_no_zeros$main_income_earner == FALSE, ]
 
 # Subset data for True Main Income Earners
-true_income_data <- cleaned_data[cleaned_data$main_income_earner == TRUE, ]
+true_income_data <- cleaned_data_no_zeros[cleaned_data_no_zeros$main_income_earner == TRUE, ]
 
 # Plot for False Main Income Earners
 ggplot(false_income_data, aes(x = economic_status, y = old_age_benefits)) +
@@ -448,7 +528,7 @@ These two plots show the joint influence of economic status and whether particip
 
 ```{r}
 # Plot using facet_wrap() for better organization
-ggplot(cleaned_data, aes(x = factor(household_size), y = old_age_benefits)) +
+ggplot(cleaned_data_no_zeros, aes(x = factor(household_size), y = old_age_benefits)) +
   geom_boxplot(fill = "lightgreen", color = "black", alpha = 0.7) +
   labs(title = "Old Age Benefits by Household Size and Economic Status", 
        x = "Household Size", y = "Old Age Benefits (€)") +
@@ -464,7 +544,7 @@ These Facet-based Plots show that for all economic status apart from Retired, FT
 
 ```{r}
 # Heatmap for Age and Economic Status vs Old Age Benefits
-ggplot(cleaned_data, aes(x = age_years, y = economic_status, fill = old_age_benefits)) +
+ggplot(cleaned_data_no_zeros, aes(x = age_years, y = economic_status, fill = old_age_benefits)) +
   geom_tile() +
   labs(title = "Heatmap: Old Age Benefits by Age and Economic Status", 
        x = "Age (years)", y = "Economic Status", fill = "Old Age Benefits (€)") +
@@ -476,4 +556,84 @@ ggplot(cleaned_data, aes(x = age_years, y = economic_status, fill = old_age_bene
 
 This heatmap shows the joint influence of age and economic status on the amount of old age benefits received by participants. Similar to the previous plots it is visible, that the economic status Retired shows the highest number of non-0€ old age benefit earners. Meanwhile most other status show hardly any participants that receive old age benefits. Another thing that can be seen here is the relationship between age and economic status with almost no students above the age of 35 and almost no retirees below 35 years of age.
 
+## Testing Regression
+
+
+
+```{r}
+# Logistic regression for likelihood of receiving pensions
+logit_model <- glm(
+  old_age_benefits > 0 ~ age_years + economic_status + household_size + region_name,
+  data = cleaned_data,
+  family = binomial()
+)
+summary(logit_model)
+```
+
+```{r}
+
+# Linear regression for benefit amounts among recipients
+lm_model <- lm(
+  old_age_benefits ~ age_years + economic_status + household_size + region_name,
+  data = cleaned_data_no_zeros
+)
+summary(lm_model)
+```
+
+
+```{r}
+# Logistic regression to predict pension receipt
+logit_model <- glm(
+  old_age_benefits > 0 ~ age_years + economic_status + household_size + region_name,
+  data = cleaned_data,
+  family = binomial()
+)
+
+summary(logit_model)
+
+```
+
+```{r}
+exp(coef(logit_model)) # Convert coefficients to odds ratios
+
+```
+
+```{r}
+library(MASS)
+# Linear regression for pension amounts
+lm_model <- lm(
+  old_age_benefits ~ age_years + economic_status + household_size + region_name,
+  data = cleaned_data_no_zeros
+)
+
+# Stepwise model selection using AIC
+stepwise_model <- stepAIC(lm_model, direction = "both")
+summary(stepwise_model)
+
+```
+
+
+
+```{r}
+# Predicted probabilities by age and economic status
+predicted_probs <- data.frame(
+  age_years = seq(min(cleaned_data$age_years), max(cleaned_data$age_years), length.out = 100),
+  economic_status = "Retired"
+)
+predicted_probs$pension_prob <- predict(logit_model, newdata = predicted_probs, type = "response")
+
+ggplot(predicted_probs, aes(x = age_years, y = pension_prob)) +
+  geom_line(color = "blue") +
+  labs(title = "Probability of Receiving a Pension by Age", x = "Age (years)", y = "Probability") +
+  theme_minimal()
+
+```
+
+```{r}
+library(effects)
+
+effect_plot <- allEffects(stepwise_model)
+plot(effect_plot)
+
+```
 
