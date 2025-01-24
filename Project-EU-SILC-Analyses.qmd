@@ -57,7 +57,7 @@ library(rmarkdown)  # For rendering reports
 library(ggplot2)    # For creating visualizations
 library(corrplot)   # For correlation matrix visualizations
 library(kableExtra) # For formatting the data dictionary
-
+library(MASS)
 library(simFrame)
 library(dplyr)
 library(sjPlot)
@@ -477,3 +477,101 @@ ggplot(cleaned_data, aes(x = age_years, y = economic_status, fill = old_age_bene
 This heatmap shows the joint influence of age and economic status on the amount of old age benefits received by participants. Similar to the previous plots it is visible, that the economic status Retired shows the highest number of non-0€ old age benefit earners. Meanwhile most other status show hardly any participants that receive old age benefits. Another thing that can be seen here is the relationship between age and economic status with almost no students above the age of 35 and almost no retirees below 35 years of age.
 
 
+
+{{< pagebreak >}}
+# Statistical Modeling
+
+The Statistical Modeling chapter aims to investigate the key factors influencing old-age benefits (old_age_benefits) by employing various statistical techniques. Building upon the descriptive statistics presented in the previous section, which explored the distribution and characteristics of variables in the dataset, we now focus on quantifying the relationships between old-age benefits and several potential explanatory variables.
+
+Given that old-age benefits is a continuous dependent variable, we will begin by applying linear regression as a baseline model, aiming to explain as much of the variation in benefits as possible through the independent variables available in the dataset. These variables include age (age_years), which intuitively may have a direct relationship with the amount of old-age benefits; economic status (economic_status), reflecting the respondent's primary economic activity and potential eligibility for benefits; region (region_name), which accounts for regional variations in benefit distributions; and household size (household_size), which could indicate whether individuals living in larger households might have different benefits due to family circumstances or financial assistance.
+
+The primary objective is to understand how each of these factors, individually and in combination, contributes to the variation in old-age benefits. We will also examine potential interactions between predictors, particularly focusing on variables such as economic_status and age_years, where it might be expected that the effect of age could differ across different economic groups.
+
+To begin with, exploratory data analysis (EDA) was performed to visualize the distributions of the key variables and check for any outliers, missing data, or skewed distributions that could impact the model. We will discuss how these factors were handled and their potential effect on the modeling process.
+
+Once the model is built, we will evaluate its performance using several diagnostic tools, such as residual plots and goodness-of-fit statistics. This chapter will also discuss model assumptions, including linearity, homoscedasticity, and normality of residuals, and how these assumptions were validated.
+
+The chapter will conclude by identifying the most significant predictors of old-age benefits, discussing the implications of these findings, and highlighting potential areas for further analysis. In addition, any limitations of the model, such as unexplained variability or non-significant predictors, will be addressed, and suggestions for potential refinements or alternative modeling approaches will be proposed.
+
+
+{{< pagebreak >}}
+## Linear Regression
+
+The goal of the linear regression analysis is to understand how different variables (such as age_years, economic_status, region_name, and household_size) influence old_age_benefits. Specifically, we aim to model the relationship between these predictors and the dependent variable.
+
+The first variable considered as a potential predictor is the age of the participants. The following code creates a linear model with old_age_benefits as the dependent variable and age_years as the predictor. This is first done with the cleaned dataset still containing rows for participants that do not receive old age benefits. The following code was used to create the linear model and show its summary:
+
+```{r}
+lm_age_with_zeros <- lm(old_age_benefits ~ age_years, data=cleaned_data)
+summary(lm_age_with_zeros)
+```
+
+### Linear Model Summary: Old Age Benefits ~ Age Years
+
+The linear model assesses the relationship between **old_age_benefits** (dependent variable) and **age_years** (independent variable). 
+
+#### Key Results:
+- **Intercept**: -7994.06 (p < 0.001): At age 0, the predicted old age benefits are negative €7,994, though not meaningful in this context.
+- **Age Coefficient**: 256.76 (p < 0.001): For each additional year of age, the old age benefits are predicted to increase by €256.76 on average.
+- **R-squared**: 0.3186: Approximately 31.86% of the variability in old age benefits is explained by age.
+- **Residual Standard Error**: 6779: The typical deviation of observed old age benefits from the model's predictions is €6,779.
+- **F-statistic**: 9681 (p < 0.001): The model is statistically significant overall.
+
+#### Conclusion:
+
+The model suggests a significant positive association between age and old-age benefits, as evidenced by the highly significant p-value and the positive slope coefficient. This indicates that, on average, older participants are likely to receive higher old-age benefits. However, the relatively low R-squared value of 0.3186 highlights that age alone explains only about 31.86% of the variability in old-age benefits. This suggests that the model may be missing other important predictors that influence old-age benefits, such as economic status, household size, or regional differences. Including such variables could improve the model's explanatory power and provide a more comprehensive understanding of the factors driving variability in old-age benefits.
+
+
+In the visual exploration of our dataset, removing rows for participants who did not receive old-age benefits significantly improved the clarity and interpretability of the visualizations. This adjustment allowed us to focus on the distribution and relationships among participants who are actively receiving benefits, reducing the noise introduced by zeros. These zeros likely represent individuals who are ineligible for old-age benefits or have not yet started receiving them, such as students, younger individuals, or those outside the scope of the benefit system.
+
+### Linear Model Summary: Old Age Benefits ~ Age Years - Old Age Benefits > €0
+
+We expect that removing the zeros may enhance the model fit, reduce variability in the residuals, and yield coefficients that better represent the association within the subset of participants actively receiving benefits. This step will help us determine whether excluding zeros leads to a clearer and more statistically significant understanding of the factors driving old-age benefit levels.
+```{r}
+lm_age_without_zeros <- lm(old_age_benefits ~ age_years, data=cleaned_data_no_zeros)
+summary(lm_age_without_zeros)
+
+```
+### Key Summary Points
+1. **Coefficients**: The intercept is **16,418.42**, and the slope for age is **-2.991**. The age coefficient is not statistically significant (p = 0.804), indicating no meaningful relationship between age and old-age benefits in this model.  
+2. **Model Fit**: The **R-squared** value is **0.0000125**, showing the model explains virtually none of the variation in old-age benefits.  
+3. **Residuals**: The **residual standard error** is high (**9,099**), indicating substantial variability that is not captured by the model.  
+4. **F-statistic**: The overall model is not statistically significant (p = 0.8038), suggesting that age alone is not a useful predictor of old-age benefits in the subset of data without zeros.  
+
+### Argument for Using Box-Cox Transformation
+The current model, after excluding zeros, performs poorly in explaining variability in old-age benefits. This poor fit could be due to the non-normality of residuals or the skewed distribution of the dependent variable. Given these issues, we will apply a **Box-Cox transformation** to explore whether transforming the dependent variable can improve the model by:
+
+1. **Stabilizing Variance**: Addressing heteroscedasticity in residuals, which may distort the results.
+2. **Improving Normality**: Making the distribution of residuals closer to normal, as linear regression assumes.
+3. **Enhancing Model Fit**: Potentially improving the relationship between age and old-age benefits by finding a transformation that better aligns the data with linear regression assumptions.
+
+The Box-Cox procedure provides an optimal transformation parameter (\( \lambda \)) that can systematically address these issues, allowing us to evaluate whether a transformed model offers better explanatory power and predictive accuracy.
+
+```{r}
+boxcox_transformed <- boxcox(cleaned_data_no_zeros$old_age_benefits ~ 1, lambda = seq(-2, 2, by = 0.1))
+
+# Optimal lambda (from the plot)
+lambda_optimal <- boxcox_transformed$x[which.max(boxcox_transformed$y)]
+print(lambda_optimal)
+```
+
+### Box-Cox Transformation Results
+The Box-Cox plot suggests an optimal lambda (\( \lambda \)) of approximately **`r lambda_optimal`**. This value is chosen because it minimizes the log-likelihood function, indicating the best transformation to stabilize variance and improve normality of the dependent variable.
+
+### Application of Lambda
+This `lambda_optimal` value will be used to transform the `old_age_benefits` variable using the formula:
+
+$$
+y(\lambda) = 
+\begin{cases} 
+\frac{y^\lambda - 1}{\lambda} & \text{if } \lambda \neq 0 \\
+\ln(y) & \text{if } \lambda = 0
+\end{cases}
+$$
+
+```{r}
+lm_age_econ <- lm(old_age_benefits ~ age_years + economic_status, data = cleaned_data)
+
+summary(lm_age_econ)
+
+```
