@@ -128,6 +128,10 @@ cleaned_data$economic_status <- factor(cleaned_data$economic_status,
                                          "Domestic"    # Domestic Tasks/Care Responsibilities
                                        ))
 
+#removing the ordering for region_name
+cleaned_data$region_name <- factor(cleaned_data$region_name, ordered = FALSE)
+
+
 cleaned_data$household_size <- as.numeric(as.character(cleaned_data$household_size))
 
 ```
@@ -499,7 +503,64 @@ The chapter will conclude by identifying the most significant predictors of old-
 
 The goal of the linear regression analysis is to understand how different variables (such as age_years, economic_status, region_name, and household_size) influence old_age_benefits. Specifically, we aim to model the relationship between these predictors and the dependent variable.
 
-The first variable considered as a potential predictor is the age of the participants. The following code creates a linear model with old_age_benefits as the dependent variable and age_years as the predictor. This is first done with the cleaned dataset still containing rows for participants that do not receive old age benefits. The following code was used to create the linear model and show its summary:
+### Correlation Matrix for numerical variables
+
+To get an overview of how the different variables could predict a participants old_age_benefits we first constructed a correlation matrix for the numerical variables to see possible positive or negative correlations. 
+
+```{r}
+cor_matrix <- cor(cleaned_data[, c("old_age_benefits", "age_years", "household_size", "main_income_earner")])
+print(cor_matrix)
+```
+
+#### Interpretation Correlation Matrix:
+
+1. **Old-age benefits and age**:  
+   The correlation between `old_age_benefits` and `age_years` is **0.5645**, which indicates a moderate positive relationship. This suggests that older participants tend to receive higher old-age benefits, which makes sense given that benefits may increase with age.
+
+2. **Old-age benefits and household size**:  
+   The correlation between `old_age_benefits` and `household_size` is **-0.2644**, indicating a weak negative relationship. This means that as the household size increases, old-age benefits tend to decrease slightly, but the relationship is not strong.
+
+3. **Old-age benefits and main income earner**:  
+   The correlation of **0.2076** between `old_age_bits` and `main_income_earner` indicates a weak positive relationship. This suggests that individuals who are the main income earner in their household might receive slightly higher old-age benefits.
+
+
+
+Before incorporating these numerical insights into our model, it's important to also assess how categorical variables, such as `economic_status` and `region_name`, influence `old_age_benefits`. Since categorical variables do not have a straightforward correlation with the dependent variable, one useful statistical test is **ANOVA (Analysis of Variance)**. ANOVA helps in understanding whether there are any statistically significant differences in the means of `old_age_benefits` across different levels of the categorical variables.
+
+### ANOVA for categorical variables
+
+We will now apply ANOVA to evaluate the impact of each category of `economic_status` and `region_name` on old-age benefits. By comparing the group means, we can determine which categorical predictors have a significant effect on the dependent variable. This step is crucial in enhancing our model by identifying relevant factors that may contribute to the variation in old-age benefits.
+
+```{r}
+# Use ANOVA for categorical variables
+aov_econ <- aov(old_age_benefits ~ economic_status, data = cleaned_data_no_zeros)
+summary(aov_econ)
+
+aov_region <- aov(old_age_benefits ~ region_name, data = cleaned_data_no_zeros)
+summary(aov_region)
+```
+
+
+```{r}
+# Use ANOVA for categorical variables
+aov_econ <- aov(old_age_benefits ~ economic_status, data = cleaned_data)
+summary(aov_econ)
+
+aov_region <- aov(old_age_benefits ~ region_name, data = cleaned_data)
+summary(aov_region)
+```
+### ANOVA Results for Categorical Variables: Economic Status and Region
+
+The ANOVA tests for economic_status and region_name reveal important insights into the relationship between these categorical variables and old_age_benefits.
+
+Economic Status: The ANOVA result for economic_status is highly significant (F(6, 20697) = 4854, p < 2e-16). This indicates that there are substantial differences in the mean old-age benefits across the various categories of economic status. The extremely low p-value reinforces that economic status is a key factor in explaining the variability in old-age benefits.
+
+Region Name: The ANOVA for region_name also shows a significant effect on old_age_benefits (F(2, 20701) = 13.35, p = 1.61e-06). This suggests that the region of the participants significantly influences the mean old-age benefits, with notable differences across regions.
+
+Both economic status and region have highly significant effects on old-age benefits, making them important predictors. These findings highlight the importance of considering both variables when modeling old-age benefits, as they contribute meaningfully to explaining the variations in the outcome.
+
+
+After this quick overview for all variables we decided to choose the age of the participants as the first variable considered as a potential predictor. The following code creates a linear model with old_age_benefits as the dependent variable and age_years as the predictor. This is first done with the cleaned dataset still containing rows for participants that do not receive old age benefits. The following code was used to create the linear model and show its summary:
 
 ```{r}
 lm_age_with_zeros <- lm(old_age_benefits ~ age_years, data=cleaned_data)
@@ -532,18 +593,20 @@ lm_age_without_zeros <- lm(old_age_benefits ~ age_years, data=cleaned_data_no_ze
 summary(lm_age_without_zeros)
 
 ```
-### Key Summary Points
+#### Key Summary Points
 1. **Coefficients**: The intercept is **16,418.42**, and the slope for age is **-2.991**. The age coefficient is not statistically significant (p = 0.804), indicating no meaningful relationship between age and old-age benefits in this model.  
 2. **Model Fit**: The **R-squared** value is **0.0000125**, showing the model explains virtually none of the variation in old-age benefits.  
 3. **Residuals**: The **residual standard error** is high (**9,099**), indicating substantial variability that is not captured by the model.  
 4. **F-statistic**: The overall model is not statistically significant (p = 0.8038), suggesting that age alone is not a useful predictor of old-age benefits in the subset of data without zeros.  
 
-### Argument for Using Box-Cox Transformation
+#### Argument for Using Box-Cox Transformation
 The current model, after excluding zeros, performs poorly in explaining variability in old-age benefits. This poor fit could be due to the non-normality of residuals or the skewed distribution of the dependent variable. Given these issues, we will apply a **Box-Cox transformation** to explore whether transforming the dependent variable can improve the model by:
 
 1. **Stabilizing Variance**: Addressing heteroscedasticity in residuals, which may distort the results.
 2. **Improving Normality**: Making the distribution of residuals closer to normal, as linear regression assumes.
 3. **Enhancing Model Fit**: Potentially improving the relationship between age and old-age benefits by finding a transformation that better aligns the data with linear regression assumptions.
+
+### Box-Cox Transformation
 
 The Box-Cox procedure provides an optimal transformation parameter (\( \lambda \)) that can systematically address these issues, allowing us to evaluate whether a transformed model offers better explanatory power and predictive accuracy.
 
@@ -555,10 +618,10 @@ lambda_optimal <- boxcox_transformed$x[which.max(boxcox_transformed$y)]
 print(lambda_optimal)
 ```
 
-### Box-Cox Transformation Results
+#### Box-Cox Transformation Results
 The Box-Cox plot suggests an optimal lambda (\( \lambda \)) of approximately **`r lambda_optimal`**. This value is chosen because it minimizes the log-likelihood function, indicating the best transformation to stabilize variance and improve normality of the dependent variable.
 
-### Application of Lambda
+#### Application of Lambda
 This `lambda_optimal` value will be used to transform the `old_age_benefits` variable using the formula:
 
 $$
@@ -570,8 +633,61 @@ y(\lambda) =
 $$
 
 ```{r}
+cleaned_data_no_zeros$boxcox_old_age_benefits <- (cleaned_data_no_zeros$old_age_benefits^lambda_optimal - 1) / lambda_optimal
+
+lm_boxcox_old_age_benefits <- lm(boxcox_old_age_benefits ~ age_years, data = cleaned_data_no_zeros)
+
+summary(lm_boxcox_old_age_benefits)
+```
+#### Interpretation:
+
+The Box-Cox transformation improved the residuals (lower standard error) but did **not improve the model's explanatory power**. The relationship between `age_years` and the transformed `old_age_benefits` is no longer statistically significant. In contrast, the original model (with zeros included) had a much stronger relationship, suggesting that removing the zeros or transforming the data did not enhance the model in this case.
+
+
+#### Conclusion of transformation:
+
+Given that removing observations with zero old-age benefits may result in a loss of valuable information, it may be worthwhile to explore the relationship between old-age benefits and multiple predictors. In this case, we will introduce economic_status as an additional explanatory variable, alongside age_years, to assess whether this combination offers a better fit for explaining the variability in old-age benefits. By working with the full dataset, including the zeros, we aim to capture a more comprehensive picture of the factors influencing old-age benefits across different economic groups.
+
+### Adding Economic Status as a predictor
+
+In this analysis, we extend the model by including economic_status as an additional predictor alongside age_years to assess whether it contributes significantly to explaining the variability in old-age benefits. This model aims to capture the combined effect of age and economic activity on old-age benefits.
+
+```{r}
 lm_age_econ <- lm(old_age_benefits ~ age_years + economic_status, data = cleaned_data)
 
 summary(lm_age_econ)
 
 ```
+
+This linear model suggests that age_years and certain categories within economic_status (such as Retired and Domestic) are statistically significant predictors of old-age benefits, with highly significant p-values for Retired and Domestic. Specifically, retirees are expected to receive significantly higher old-age benefits, while those engaged in domestic activities also have higher benefits compared to the reference category. The low p-values for PT_Work, Unemployed, Student, and Disabled indicate these categories are not significant predictors in this model.
+
+The model's R-squared value of 0.5847 indicates that roughly 58% of the variance in old-age benefits is explained by age and economic status.
+
+```{r}
+# Adding region_name as a third predictor to the model
+lm_age_econ_region <- lm(old_age_benefits ~ age_years + economic_status + household_size, data = cleaned_data)
+
+# Summarize the model
+summary(lm_age_econ_region)
+
+
+lm_region_only <- lm(old_age_benefits ~ cleaned_data$main_income_earner
+                     , data = cleaned_data)
+summary(lm_region_only)
+
+```
+
+```{r}
+cor_matrix <- cor(cleaned_data[, c("old_age_benefits", "age_years", "household_size", "main_income_earner")])
+print(cor_matrix)
+```
+
+```{r}
+# Use ANOVA for categorical variables
+aov_econ <- aov(old_age_benefits ~ economic_status, data = cleaned_data)
+summary(aov_econ)
+
+aov_region <- aov(old_age_benefits ~ region_name, data = cleaned_data)
+summary(aov_region)
+```
+
