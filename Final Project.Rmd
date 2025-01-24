@@ -36,7 +36,7 @@ Age (age): The respondent's age in years.
 
 ```{r}
 # List of required packages
-packages <- c("simFrame", "dplyr", "ggplot2", "sjPlot", "interactions")
+packages <- c("simFrame", "dplyr", "ggplot2", "sjPlot", "interactions", "MASS")
 
 # Install missing packages and load all, suppressing messages and warnings
 invisible(lapply(packages, function(pkg) {
@@ -456,5 +456,150 @@ This heatmap shows the joint influence of age and economic status on the amount 
 
 New line to check Version control.
 
+/newpage
+# Statistical Methods
 
+
+```{r}
+head(cleaned_data)
+
+linear_model_age <- lm(old_age_benefits ~ age_years, data = cleaned_data)
+print(linear_model_age)
+```
+
+```{r}
+summary(linear_model_age)
+```
+
+```{r}
+plot(linear_model_age)
+```
+```{r}
+library(MASS)
+boxcox(linear_model_age, lambda = seq(-2, 2, 0.1))
+```
+```{r}
+# Compute basic statistics for 'old_age_benefits'
+min_value <- min(cleaned_data$old_age_benefits, na.rm = TRUE)
+max_value <- max(cleaned_data$old_age_benefits, na.rm = TRUE)
+mean_value <- mean(cleaned_data$old_age_benefits, na.rm = TRUE)
+median_value <- median(cleaned_data$old_age_benefits, na.rm = TRUE)
+
+# Print results
+cat("Minimum:", min_value, "\n")
+cat("Maximum:", max_value, "\n")
+cat("Mean:", mean_value, "\n")
+cat("Median:", median_value, "\n")
+```
+
+```{r}
+{r}
+# Filter out zeros in old_age_benefits for regression analysis
+cleaned_data_noZeros <- cleaned_data %>%
+  filter(old_age_benefits > 0)
+```
+```{r}
+# Compute basic statistics for 'old_age_benefits'
+min_value <- min(cleaned_data_noZeros$old_age_benefits, na.rm = TRUE)
+max_value <- max(cleaned_data_noZeros$old_age_benefits, na.rm = TRUE)
+mean_value <- mean(cleaned_data_noZeros$old_age_benefits, na.rm = TRUE)
+median_value <- median(cleaned_data_noZeros$old_age_benefits, na.rm = TRUE)
+
+# Print results
+cat("Minimum:", min_value, "\n")
+cat("Maximum:", max_value, "\n")
+cat("Mean:", mean_value, "\n")
+cat("Median:", median_value, "\n")
+```
+
+```{r}
+head(cleaned_data_noZeros)
+
+linear_model_age_noZeros <- lm(old_age_benefits ~ age_years, data = cleaned_data_noZeros)
+print(linear_model_age_noZeros)
+```
+```{r}
+summary(linear_model_age_noZeros)
+```
+```{r}
+plot(linear_model_age_noZeros)
+```
+
+```{r}
+# Boxplot for old_age_benefits
+boxplot(cleaned_data_noZeros$old_age_benefits, main = "Boxplot of Old Age Benefits")
+
+```
+```{r}
+# Histogram of old_age_benefits
+hist(cleaned_data_noZeros$old_age_benefits, 
+     main = "Histogram of Old Age Benefits", 
+     xlab = "Old Age Benefits", 
+     breaks = 50)
+```
+```{r}
+# Histogram of old_age_benefits
+hist(cleaned_data$old_age_benefits, 
+     main = "Histogram of Old Age Benefits", 
+     xlab = "Old Age Benefits", 
+     breaks = 50)
+```
+```{r}
+# Calculate Z-scores for old_age_benefits
+z_scores <- scale(cleaned_data_noZeros$old_age_benefits)
+
+# Identify outliers (Z-scores greater than 3 or less than -3)
+outliers <- cleaned_data_noZeros[abs(z_scores) > 3, ]
+print(outliers)
+```
+```{r}
+cleaned_data_noZeros$log_old_age_benefits <- log(cleaned_data_noZeros$old_age_benefits + 1)
+
+# Histogram of old_age_benefits
+hist(cleaned_data_noZeros$log_old_age_benefits, 
+     main = "Histogram of logarithmic Old Age Benefits", 
+     xlab = "Log Old Age Benefits", 
+     breaks = 50)
+```
+```{r}
+lm_log_old_age_benefits <- lm(log_old_age_benefits ~ age_years, data = cleaned_data_noZeros)
+
+print(lm_log_old_age_benefits)
+
+summary(lm_log_old_age_benefits)
+```
+```{r}
+# Winsorize old_age_benefits by capping at the 1st and 99th percentiles
+lower_percentile <- quantile(cleaned_data_noZeros$old_age_benefits, 0.01)
+upper_percentile <- quantile(cleaned_data_noZeros$old_age_benefits, 0.95)
+
+cleaned_data_noZeros$winsorized_old_age_benefits <- pmin(pmax(cleaned_data_noZeros$old_age_benefits, lower_percentile), upper_percentile)
+
+
+lm_winsorized_old_age_benefits <- lm(winsorized_old_age_benefits ~ age_years, data = cleaned_data_noZeros)
+
+print(lm_winsorized_old_age_benefits)
+
+summary(lm_winsorized_old_age_benefits)
+```
+
+```{r}
+boxcox_transformed <- boxcox(cleaned_data_noZeros$old_age_benefits ~ 1, lambda = seq(-2, 2, by = 0.1))
+
+plot(boxcox_transformed)
+# Optimal lambda (from the plot)
+lambda_optimal <- boxcox_transformed$x[which.max(boxcox_transformed$y)]
+print(lambda_optimal)
+```
+
+```{r}
+cleaned_data_noZeros$boxcox_old_age_benefits <- (cleaned_data_noZeros$old_age_benefits^lambda_optimal - 1) / lambda_optimal
+
+lm_boxcox_old_age_benefits <- lm(boxcox_old_age_benefits ~ age_years, data = cleaned_data_noZeros)
+
+print(lm_boxcox_old_age_benefits)
+
+summary(lm_boxcox_old_age_benefits)
+
+```
 
