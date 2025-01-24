@@ -237,21 +237,6 @@ The histogram shows a concentration of respondents between 30 and 60 years old. 
 #### Old age benefits Distribution
 The first variable we will explore is **old_age_benefits**. We will visualize its distribution to check for any skewness and identify outliers.
 
-```{r}
-# Plot histogram of old_age_benefits distribution
-ggplot(cleaned_data, aes(x = old_age_benefits)) +
-  geom_histogram(binwidth = 1000, fill = "skyblue", color = "black", alpha = 0.7) +
-  labs(title = "Old age benefits Distribution", x = "Old age benefits", y = "Frequency") +
-  theme_minimal()
-```
-
-The distribution of old_age_benefits is heavily right-skewed, with a large concentration of values at €0 (zero-inflated). This indicates that most individuals do not receive old-age benefits. The histogram also shows a unimodal distribution, where the majority of non-zero values are clustered at lower benefit amounts, with a few outliers receiving significantly higher benefits. This could be because generally individuals in Austria start to receive old age benefits after already working a substantial number of years or reaching certain age threshholds.
-
-As the old-age benefits increase, the number of respondents receiving those benefits sharply decreases, suggesting that only a few individuals receive high amounts of old-age benefits, with outliers reaching up to €101,777.
-
-The distribution of old_age_benefits is heavily right-skewed, with a large concentration of values at €0 (zero-inflated). This indicates that most individuals do not receive old-age benefits. The histogram also shows a unimodal distribution, where the majority of non-zero values are clustered at lower benefit amounts, with a few outliers receiving significantly higher benefits.
-
-
 
 ```{r}
 # Histogram for positive old_age_benefits
@@ -270,18 +255,18 @@ The histogram for positive old_age_benefits shows a right-skewed distribution, w
 
 ```{r}
 # Employment Status (Bar plot with percentage)
-ggplot(cleaned_data, aes(x = main_income_earner)) +
+ggplot(cleaned_data_no_zeros, aes(x = main_income_earner)) +
   geom_bar(aes(y = (after_stat(count))/sum(after_stat(count))), fill = "lightgreen", color = "black", alpha = 0.7) +
   scale_y_continuous(labels = scales::percent) +  # Format y-axis as percentage
   labs(title = "Main Income Earner Distribution", x = "Is Main Income Earner", y = "Percentage") +
   theme_minimal()
 
 ```
-This simple barplot shows that arount 55% of participants are the main income earners of their households.
+This simple barplot shows that around 65% of participants are the main income earners of their households.
 
 ```{r}
 # Economic Status (Bar plot)
-ggplot(cleaned_data, aes(x = economic_status)) +
+ggplot(cleaned_data_no_zeros, aes(x = economic_status)) +
   geom_bar(fill = "salmon", color = "black", alpha = 0.7) +
   labs(title = "Economic Status Distribution", x = "Economic Status", y = "Count") +
   theme_minimal()
@@ -292,7 +277,7 @@ ggplot(cleaned_data, aes(x = economic_status)) +
 The previous barplot clearly shows that the biggest part of surveyants are working full time, the second largest group are retirees followed by individuals fulfilling domestic tasks and care responsibilities. The number of people that are working part time, are unemployed or studying each make up a similar share of the dataset. The lowest number of participants are either permanently disabled or/and unfit to work.
 ```{r}
 # Household Size (Histogram)
-ggplot(cleaned_data, aes(x = household_size)) +
+ggplot(cleaned_data_no_zeros, aes(x = household_size)) +
   geom_histogram(binwidth = 1, fill = "lightcoral", color = "black", alpha = 0.7) +
   labs(title = "Household Size Distribution", x = "Household Size", y = "Count") +
   theme_minimal()
@@ -302,7 +287,7 @@ The household size distribution in the dataset is right-skewed, with the majorit
 
 ```{r}
 # Age (Histogram)
-ggplot(cleaned_data, aes(x = age_years)) +
+ggplot(cleaned_data_no_zeros, aes(x = age_years)) +
   geom_histogram(binwidth = 5, fill = "lightyellow", color = "black", alpha = 0.7) +
   labs(title = "Age Distribution", x = "Age (years)", y = "Count") +
   theme_minimal()
@@ -317,14 +302,14 @@ For each independent variable, we will plot its relationship with the dependent 
 
 ```{r, fig.align='center'}
 # Main Income Earner vs Old Age Benefits (Boxplot)
-ggplot(cleaned_data, aes(x = main_income_earner, y = old_age_benefits)) +
+ggplot(cleaned_data_no_zeros, aes(x = main_income_earner, y = old_age_benefits)) +
   geom_boxplot(fill = "skyblue", color = "black", alpha = 0.7) +
   labs(title = "Old Age Benefits by Employment Status", x = "Is main income earner", y = "Old Age Benefits (€)") +
   theme_minimal()
 ```
 ```{r}
 # Summary statistics for Old Age Benefits by Main Income Earner status
-summary_stats <- cleaned_data %>%
+summary_stats <- cleaned_data_no_zeros %>%
   group_by(main_income_earner) %>%
   summarise(
     mean_benefits = mean(old_age_benefits, na.rm = TRUE),
@@ -347,14 +332,14 @@ The analysis of old age benefits by employment status reveals that a large propo
 #### Economic Status vs. Old Age Benefits: Boxplot to show the distribution of old-age benefits across economic statuses.
 ```{r, fig.align='center'}
 # Economic Status vs Old Age Benefits (Boxplot)
-ggplot(cleaned_data, aes(x = economic_status, y = old_age_benefits)) +
+ggplot(cleaned_data_no_zeros, aes(x = economic_status, y = old_age_benefits)) +
   geom_boxplot(fill = "salmon", color = "black", alpha = 0.7) +
   labs(title = "Old Age Benefits by Economic Status", x = "Economic Status", y = "Old Age Benefits (€)") +
   theme_minimal()
 ```
 ```{r}
 # Summarizing old age benefits by economic status
-summary_stats2 <- cleaned_data %>%
+summary_stats2 <- cleaned_data_no_zeros %>%
   group_by(economic_status) %>%
   summarise(
     mean_benefits = mean(old_age_benefits, na.rm = TRUE),
@@ -377,7 +362,7 @@ The boxplot and summary of Old Age Benefits by Economic Status reveal considerab
 #### Household Size vs. Old Age Benefits: Scatter plot to show how household size affects old-age benefits.
 ```{r, fig.align='center'}
 # Household Size vs Old Age Benefits (Scatter plot)
-ggplot(cleaned_data, aes(x = household_size, y = old_age_benefits)) +
+ggplot(cleaned_data_no_zeros, aes(x = household_size, y = old_age_benefits)) +
   geom_point(color = "darkred", alpha = 0.5) +
   labs(title = "Old Age Benefits by Household Size", x = "Household Size", y = "Old Age Benefits (€)") +
   theme_minimal()
