@@ -1,0 +1,112 @@
+
+
+```{r}
+# Contingency table for household size and economic status
+table_household_economic <- table(cleaned_data$household_size, cleaned_data$economic_status)
+print(table_household_economic)
+
+# Chi-square test for association between household size and economic status
+chisq_test <- chisq.test(table_household_economic)
+chisq_test
+
+# Visualization: Bar plot of household size vs economic status
+ggplot(cleaned_data, aes(x = as.factor(household_size), fill = economic_status)) +
+  geom_bar(position = "fill") +
+  labs(title = "Proportion of Economic Status by Household Size", x = "Household Size", y = "Proportion") +
+  theme_minimal()
+```
+
+
+## 3. Regional Disparities in Socioeconomic Indicators
+
+```{r}
+# Boxplot to compare old_age_benefits across regions
+ggplot(cleaned_data, aes(x = region_name, y = old_age_benefits, fill = region_name)) +
+  geom_boxplot() +
+  labs(title = "old_age_benefits Distribution by Region", x = "Region", y = "old_age_benefits") +
+  theme_minimal()
+
+# ANOVA test to check for regional differences in old_age_benefits
+anova_region <- aov(old_age_benefits ~ region_name, data = cleaned_data)
+summary(anova_region)
+
+# Bar plot of economic status proportions by region
+ggplot(cleaned_data, aes(x = region_name, fill = economic_status)) +
+  geom_bar(position = "fill") +
+  labs(title = "Proportion of Economic Status by Region", x = "Region", y = "Proportion") +
+  theme_minimal()
+```
+
+
+## 4. Age and Economic Outcomes
+
+```{r}
+# Scatterplot to visualize the relationship between age and old_age_benefits
+ggplot(cleaned_data, aes(x = age_years, y = old_age_benefits)) +
+  geom_point(alpha = 0.5) +
+  geom_smooth(method = "lm", color = "blue") +
+  labs(title = "Relationship Between Age and old_age_benefits", x = "Age (Years)", y = "old_age_benefits") +
+  theme_minimal()
+
+# Group individuals into age categories and analyze trends
+cleaned_data <- cleaned_data %>%
+  mutate(age_group = cut(age_years, breaks=c(0, 30, 50, Inf), labels=c("Young Adult", "Middle-aged", "Senior")))
+
+# Boxplot of old_age_benefits by age group
+ggplot(cleaned_data, aes(x = age_group, y = old_age_benefits, fill = age_group)) +
+  geom_boxplot() +
+  labs(title = "old_age_benefits Distribution by Age Group", x = "Age Group", y = "old_age_benefits") +
+  theme_minimal()
+
+# ANOVA test to check for differences in old_age_benefits across age groups
+anova_age <- aov(old_age_benefits ~ age_group, data = cleaned_data)
+summary(anova_age)
+```
+
+
+## 5. Interaction Effects Between Employment Status and Region
+
+```{r}
+# Convert main_income_earner to a factor
+cleaned_data$main_income_earner <- as.factor(cleaned_data$main_income_earner)
+
+# Check the structure of the data to confirm the change
+str(cleaned_data)
+
+# Fit a linear model with interaction terms
+interaction_model <- lm(old_age_benefits ~ main_income_earner * region_name, data = cleaned_data)
+
+# Plot interaction effects using sjPlot
+plot_model(interaction_model, type = "pred", terms = c("main_income_earner", "region_name")) +
+  labs(title = "Interaction Between Employment Status and Region", 
+       x = "Employment Status", 
+       y = "Predicted old_age_benefits") +
+  theme_minimal()
+```
+
+```{r}
+# Fit a linear model with interaction terms
+interaction_model <- lm(old_age_benefits ~ main_income_earner * region_name, data = cleaned_data)
+
+# Plot interaction effects using interactions package
+interact_plot(interaction_model, pred = main_income_earner, modx = region_name) +
+  labs(title = "Interaction Between Employment Status and Region",
+       x = "Employment Status",
+       y = "Predicted old_age_benefits") +
+  theme_minimal()
+```
+
+
+```{r}
+
+
+# T-test to compare the means of Old Age Benefits between the two groups
+t_test_result <- t.test(old_age_benefits ~ main_income_earner, data = cleaned_data)
+print(t_test_result)
+
+# If assumptions for t-test are not met, you can use a Wilcoxon test
+wilcox_test_result <- wilcox.test(old_age_benefits ~ main_income_earner, data = cleaned_data)
+print(wilcox_test_result)
+
+```
+

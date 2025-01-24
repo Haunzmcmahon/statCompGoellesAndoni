@@ -454,4 +454,7 @@ ggplot(cleaned_data, aes(x = age_years, y = economic_status, fill = old_age_bene
 This heatmap shows the joint influence of age and economic status on the amount of old age benefits received by participants. Similar to the previous plots it is visible, that the economic status Retired shows the highest number of non-0€ old age benefit earners. Meanwhile most other status show hardly any participants that receive old age benefits. Another thing that can be seen here is the relationship between age and economic status with almost no students above the age of 35 and almost no retirees below 35 years of age.
 
 
+New line to check Version control.
+
+
 
