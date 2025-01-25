@@ -560,8 +560,8 @@ ggplot(cleaned_data_no_zeros, aes(x = age_years, y = economic_status, fill = old
 
 This heatmap shows the joint influence of age and economic status on the amount of old age benefits received by participants. Similar to the previous plots it is visible, that the economic status Retired shows the highest number of non-0€ old age benefit earners. Meanwhile most other status show hardly any participants that receive old age benefits. Another thing that can be seen here is the relationship between age and economic status with almost no students above the age of 35 and almost no retirees below 35 years of age.
 
-## Testing Regression
 
+## Testing Regression
 
 
 ```{r}
@@ -620,16 +620,16 @@ summary(stepwise_model)
 
 ```{r}
 # Predicted probabilities by age and economic status
-predicted_probs <- data.frame(
-  age_years = seq(min(cleaned_data$age_years), max(cleaned_data$age_years), length.out = 100),
-  economic_status = "Retired"
-)
-predicted_probs$pension_prob <- predict(logit_model, newdata = predicted_probs, type = "response")
-
-ggplot(predicted_probs, aes(x = age_years, y = pension_prob)) +
-  geom_line(color = "blue") +
-  labs(title = "Probability of Receiving a Pension by Age", x = "Age (years)", y = "Probability") +
-  theme_minimal()
+# predicted_probs <- data.frame(
+#   age_years = seq(min(cleaned_data$age_years), max(cleaned_data$age_years), length.out = 100),
+#   economic_status = "Retired"
+# )
+# predicted_probs$pension_prob <- predict(logit_model, newdata = predicted_probs, type = "response")
+# 
+# ggplot(predicted_probs, aes(x = age_years, y = pension_prob)) +
+#   geom_line(color = "blue") +
+#   labs(title = "Probability of Receiving a Pension by Age", x = "Age (years)", y = "Probability") +
+#   theme_minimal()
 
 ```
 
