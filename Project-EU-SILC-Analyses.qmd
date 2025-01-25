@@ -823,17 +823,35 @@ This linear model suggests that age_years and certain categories within economic
 
 The model's R-squared value of 0.5847 indicates that roughly 58% of the variance in old-age benefits is explained by age and economic status.
 
+
+
+### Transition to Regression with Retirees
+
+The previous analyses have shown that the economic status categories 'Retired' and 'Domestic' are significant predictors of old-age benefits. However, within the cleaned dataset (excluding zeros), retirees account for over 96% of the remaining observations, with less than 4% belonging to other economic status categories. This extreme imbalance limits the reliability of insights drawn from non-retirees and underscores that retirees dominate the population of interest.
+
+Further, the removal of zeros has substantially altered the dataset's composition, as shown in the **Comparison of Key Variables Before and After Cleaning** table in the Data Cleaning chapter:
+
+```{r}
+knitr::kable(comparison_summary, caption = "Comparison of Key Variables Before and After Removing Rows with Old Age Benefits = 0") |>
+  kableExtra::kable_styling(full_width = FALSE, position = "center")
+```
+
+
+Given these observations, it is logical to focus exclusively on retirees for further linear regression modeling. By isolating retirees, we can more accurately capture the patterns and relationships specific to the largest and most relevant group in the dataset.
+
+
+```{r}
+# Filter the dataset to include only rows where economic_status is 'Retired' or 'Domestic'
+cleaned_data_no_zeros_retirees_only <- cleaned_data_no_zeros %>%
+  filter(economic_status %in% c("Retired", "Domestic"))
+
+```
+
+
 ```{r}
 # Adding region_name as a third predictor to the model
-lm_age_econ_region <- lm(old_age_benefits ~ age_years + economic_status + household_size, data = cleaned_data)
+lm_age_econ_region <- lm(old_age_benefits ~ region_name, data = cleaned_data_no_zeros_retirees_only)
 
-# Summarize the model
-summary(lm_age_econ_region)
-
-
-lm_region_only <- lm(old_age_benefits ~ cleaned_data$main_income_earner
-                     , data = cleaned_data)
-summary(lm_region_only)
 
 ```
 
