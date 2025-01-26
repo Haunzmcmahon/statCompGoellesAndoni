@@ -695,7 +695,7 @@ summary(lm_baseline)
   - Interpretation: Household size does not have a statistically significant effect on pension amounts.
 
 
-### Model Fit:
+### Model Fit
 
 - **Adjusted $R^2$**: 0.04733.
 
@@ -795,7 +795,7 @@ lm_final <- lm(
 )
 summary(lm_final)
 ```
-#### Key Results:
+#### Key Results
 
 - Age (age_years):
   - Coefficient: -42.51 (p < 0.001).
@@ -931,22 +931,117 @@ The refined model focusing on retirees highlights the following key findings:
 
 
 
+## Exploring Interaction Terms and Alternative Modeling Approaches
+
+In this section, we address the limitations of the current model, including heteroscedasticity, non-normality of residuals, and influential observations. Two approaches are explored to improve the model's performance and address these issues:
+
+- Adding interaction terms to capture joint effects between predictors.
+
+- Using mixed-effects models to account for hierarchical or grouped structures in the data.
 
 
+### Adding Interaction Terms
+
+#### Purpose
+
+Interaction terms allow us to examine whether the relationship between one predictor (e.g., `age_years`) and the dependent variable (`old_age_benefits`) changes depending on the value of another predictor (e.g., `region_name` or `economic_status`). This makes the model more flexible and potentially improves its fit.
 
 
+#### Implementation
+
+We include interaction terms for:
+`age_years` and `region_name`: To explore whether the effect of age on benefits differs across regions.
+`age_years` and `economic_status`: To examine whether the effect of age varies across economic groups.
+
+```{r}
+# Adding interaction terms
+lm_interaction <- lm(
+  old_age_benefits ~ age_years * region_name + age_years * economic_status,
+  data = cleaned_data_no_zeros
+)
+summary(lm_interaction)
+
+```
+
+#### Key Results
+
+Based on the regression results that include interaction terms between age_years and region_name as well as age_years and economic_status:
+
+- Age (age_years):
+  - The main effect of age is not significant (p = 0.220), but several interaction terms involving age are significant, suggesting that the effect of age on old-age benefits depends on the region and economic status.
+
+- Region (region_name):
+  - Residents of Vienna receive significantly lower pensions compared to Burgenland when age is not considered (main effect: -6403.17, p < 0.05).
+  - The interaction terms indicate that the effect of age on benefits is stronger in Vienna (154.65, p < 0.001) and Lower Austria (86.13, p < 0.05) compared to Burgenland.
+
+- Economic Status (economic_status):
+  - Retired individuals receive significantly higher pensions (main effect: 17166.35, p < 0.01).
+  - Disabled individuals also receive significantly higher pensions (36699.53, p < 0.05).
+  - Interaction terms for age and economic status show that:
+The negative effect of age is stronger for retirees (-307.56, p < 0.05), disabled individuals (-878.74, p < 0.01), and domestic workers (-271.20, p < 0.05).
+
+- Model Fit:
+  - Adjusted $R^2$ : 0.05149.
+  - Residual Standard Error (RSE): 8861.
+  - Interpretation: Adding interaction terms slightly improves the model's explanatory power but does not fully address diagnostic issues.
 
 
+### Mixed-Effects Models
+
+#### Purpose
+Mixed-effects models address heteroscedasticity and non-normality by incorporating random effects that account for variability within groups (e.g., regions or economic statuses). This approach is particularly useful when data has a hierarchical structure.
 
 
+#### Implementation
+We use a random intercept model with region_name as a grouping variable:
+
+```{r}
+library(lme4)
+
+# Mixed-effects model
+mixed_model <- lmer(
+  old_age_benefits ~ age_years + economic_status + (1 | region_name),
+  data = cleaned_data_no_zeros
+)
+summary(mixed_model)
+
+```
+
+#### Key Results
 
 
+Based on the mixed-effects model with region_name as a random effect:
+
+- Age (age_years):
+  - Coefficient: -42.73 (p < 0.001).
+  - Interpretation: Each additional year of age is associated with a decrease of €42.73 in old-age benefits, consistent with previous models.
+
+- Economic Status (economic_status):
+  - Retired individuals receive significantly higher pensions (4440.47, p < 0.01).
+  - Domestic workers receive significantly lower pensions (-4463.35, p < 0.01).
+
+- Random Effects:
+  - Variance for region_name: 4539859.
+  - Residual variance: 78852810.
+  - Interpretation: The random intercept for regions captures some variability in benefits across regions but does not fully explain the variance.
+
+- Model Fit:
+  - REML Criterion: 103571.9.
+  - Residual Standard Error (RSE): 8880.
+  - Interpretation: The mixed-effects model does not substantially improve model fit compared to the fixed-effects models.
 
 
+### Conclusion
+- Adding Interaction Terms:
+  - Interaction terms reveal that the effect of age on old-age benefits varies by region and economic status.
+  - However, the overall improvement in model fit is modest, with Adjusted $R^2$ increasing only slightly to 5.15%.
 
+- Mixed-Effects Models:
+  - Including region_name as a random effect captures variability across regions but does not significantly improve explanatory power or address diagnostic issues.
 
-
-
+- Persistent Issues:
+  - Both models still exhibit heteroscedasticity and non-normality of residuals, as shown in the diagnostic plots.
+  - Influential observations remain, potentially affecting model estimates.
 
 
 ## Jonannes
