@@ -848,24 +848,4 @@ cleaned_data_no_zeros_retirees_only <- cleaned_data_no_zeros %>%
 ```
 
 
-```{r}
-# Adding region_name as a third predictor to the model
-lm_age_econ_region <- lm(old_age_benefits ~ region_name, data = cleaned_data_no_zeros_retirees_only)
-
-
-```
-
-```{r}
-cor_matrix <- cor(cleaned_data[, c("old_age_benefits", "age_years", "household_size", "main_income_earner")])
-print(cor_matrix)
-```
-
-```{r}
-# Use ANOVA for categorical variables
-aov_econ <- aov(old_age_benefits ~ economic_status, data = cleaned_data)
-summary(aov_econ)
-
-aov_region <- aov(old_age_benefits ~ region_name, data = cleaned_data)
-summary(aov_region)
-```
 
