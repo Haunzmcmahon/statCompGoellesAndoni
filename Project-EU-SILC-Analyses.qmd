@@ -1087,6 +1087,16 @@ pairs(cleaned_data_no_zeros[, c("old_age_benefits", "age_years", "household_size
 
 ```
 
+<<<<<<< HEAD
+=======
+<<<<<<< HEAD
+
+
+=======
+```{r}
+# Adding region_name as a third predictor to the model
+lm_age_econ_region <- lm(old_age_benefits ~ region_name, data = cleaned_data_no_zeros_retirees_only)
+>>>>>>> 70bce63f2a7a94b364089cb84f3e8f9a469f3f5f
 
 ## Effect Plots for Interactions
 
@@ -1156,6 +1166,7 @@ lm_combined <- lm(
 )
 summary(lm_combined)
 ```
+<<<<<<< HEAD
 
 ## Refined Model: Main Income Earner and Household Size
 
@@ -1203,3 +1214,6 @@ summary(lm_high_interaction)
 
 ```
 
+=======
+>>>>>>> 20eb8b41edc06c85ce08713c50c030fb27decf6d
+>>>>>>> 70bce63f2a7a94b364089cb84f3e8f9a469f3f5f
