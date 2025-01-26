@@ -1044,104 +1044,162 @@ Based on the mixed-effects model with region_name as a random effect:
   - Influential observations remain, potentially affecting model estimates.
 
 
-## Jonannes
-
-### Box-Cox Transformation
-
-The Box-Cox procedure provides an optimal transformation parameter (( \lambda )) that can systematically address these issues, allowing us to evaluate whether a transformed model offers better explanatory power and predictive accuracy.
+## Local Polynomial Regression Fitting
 
 ```{r}
-boxcox_transformed <- boxcox(cleaned_data_no_zeros$old_age_benefits ~ 1, lambda = seq(-2, 2, by = 0.1))
-
-# Optimal lambda (from the plot)
-lambda_optimal <- boxcox_transformed$x[which.max(boxcox_transformed$y)]
-print(lambda_optimal)
-```
-
-#### Box-Cox Transformation Results
-
-The Box-Cox plot suggests an optimal lambda (( \lambda )) of approximately **`r lambda_optimal`**. This value is chosen because it minimizes the log-likelihood function, indicating the best transformation to stabilize variance and improve normality of the dependent variable.
-
-#### Application of Lambda
-
-This `lambda_optimal` value will be used to transform the `old_age_benefits` variable using the formula:
-
-$$
-y(\lambda) = 
-\begin{cases} 
-\frac{y^\lambda - 1}{\lambda} & \text{if } \lambda \neq 0 \\
-\ln(y) & \text{if } \lambda = 0
-\end{cases}
-$$
-
-```{r}
-cleaned_data_no_zeros$boxcox_old_age_benefits <- (cleaned_data_no_zeros$old_age_benefits^lambda_optimal - 1) / lambda_optimal
-
-lm_boxcox_old_age_benefits <- lm(boxcox_old_age_benefits ~ age_years, data = cleaned_data_no_zeros)
-
-summary(lm_boxcox_old_age_benefits)
-```
-
-#### Interpretation:
-
-The Box-Cox transformation improved the residuals (lower standard error) but did **not improve the model's explanatory power**. The relationship between `age_years` and the transformed `old_age_benefits` is no longer statistically significant. In contrast, the original model (with zeros included) had a much stronger relationship, suggesting that removing the zeros or transforming the data did not enhance the model in this case.
-
-#### Conclusion of transformation:
-
-Given that removing observations with zero old-age benefits may result in a loss of valuable information, it may be worthwhile to explore the relationship between old-age benefits and multiple predictors. In this case, we will introduce economic_status as an additional explanatory variable, alongside age_years, to assess whether this combination offers a better fit for explaining the variability in old-age benefits. By working with the full dataset, including the zeros, we aim to capture a more comprehensive picture of the factors influencing old-age benefits across different economic groups.
-
-### Adding Economic Status as a predictor
-
-In this analysis, we extend the model by including economic_status as an additional predictor alongside age_years to assess whether it contributes significantly to explaining the variability in old-age benefits. This model aims to capture the combined effect of age and economic activity on old-age benefits.
-
-```{r}
-lm_age_econ <- lm(old_age_benefits ~ age_years + economic_status, data = cleaned_data)
-
-summary(lm_age_econ)
+library(car)
+scatterplot(old_age_benefits ~ age_years, data = cleaned_data_no_zeros, smooth = list(style = "lines"), col = 1)
 
 ```
 
-This linear model suggests that age_years and certain categories within economic_status (such as Retired and Domestic) are statistically significant predictors of old-age benefits, with highly significant p-values for Retired and Domestic. Specifically, retirees are expected to receive significantly higher old-age benefits, while those engaged in domestic activities also have higher benefits compared to the reference category. The low p-values for PT_Work, Unemployed, Student, and Disabled indicate these categories are not significant predictors in this model.
+The scatterplot shows the relationship between `age_years` (x-axis) and `old_age_benefits` (y-axis), with additional marginal boxplots for both variables. Key observations include:
 
-The model's R-squared value of 0.5847 indicates that roughly 58% of the variance in old-age benefits is explained by age and economic status.
+- A clear right-skewed distribution for `old_age_benefits`, as shown by the marginal boxplot on the left.
+- A relatively uniform distribution of `age_years`, with a slight concentration around retirement age (60–70 years).
+- The scatterplot suggests a weak or non-linear relationship between `age_years` and `old_age_benefits`, with high variability in benefits across all age groups.
 
-### Transition to Regression with Retirees
 
-The previous analyses have shown that the economic status categories 'Retired' and 'Domestic' are significant predictors of old-age benefits. However, within the cleaned dataset (excluding zeros), retirees account for over 96% of the remaining observations, with less than 4% belonging to other economic status categories. This extreme imbalance limits the reliability of insights drawn from non-retirees and underscores that retirees dominate the population of interest.
 
-Further, the removal of zeros has substantially altered the dataset's composition, as shown in the **Comparison of Key Variables Before and After Cleaning** table in the Data Cleaning chapter:
-
-```{r}
-knitr::kable(comparison_summary, caption = "Comparison of Key Variables Before and After Removing Rows with Old Age Benefits = 0") |>
-  kableExtra::kable_styling(full_width = FALSE, position = "center")
-```
-
-Given these observations, it is logical to focus exclusively on retirees for further linear regression modeling. By isolating retirees, we can more accurately capture the patterns and relationships specific to the largest and most relevant group in the dataset.
+## Logarithmic Transformations
 
 ```{r}
-# Filter the dataset to include only rows where economic_status is 'Retired' or 'Domestic'
-cleaned_data_no_zeros_retirees_only <- cleaned_data_no_zeros %>%
-  filter(economic_status %in% c("Retired", "Domestic"))
-
+cleaned_data_no_zeros$log_old_age_benefits <- log(cleaned_data_no_zeros$old_age_benefits + 1)
+lm_log <- lm(log_old_age_benefits ~ log(age_years + 1) + economic_status + region_name, data = cleaned_data_no_zeros)
+summary(lm_log)
 ```
+
+
+
+## Bivariate Kernel Density Estimates
 
 ```{r}
-# Adding region_name as a third predictor to the model
-lm_age_econ_region <- lm(old_age_benefits ~ region_name, data = cleaned_data_no_zeros_retirees_only)
-
-
+kde <- kde2d(cleaned_data_no_zeros$age_years, cleaned_data_no_zeros$old_age_benefits, n = 250)
+filled.contour(kde)
 ```
+
+
+
+
+## Scatterplot Matrices
 
 ```{r}
-cor_matrix <- cor(cleaned_data[, c("old_age_benefits", "age_years", "household_size", "main_income_earner")])
-print(cor_matrix)
+pairs(cleaned_data_no_zeros[, c("old_age_benefits", "age_years", "household_size")], panel = panel.smooth)
+
 ```
+
+
+## Effect Plots for Interactions
 
 ```{r}
-# Use ANOVA for categorical variables
-aov_econ <- aov(old_age_benefits ~ economic_status, data = cleaned_data)
-summary(aov_econ)
-
-aov_region <- aov(old_age_benefits ~ region_name, data = cleaned_data)
-summary(aov_region)
+library(effects)
+effect_plot <- allEffects(lm_interaction)
+plot(effect_plot, multiline = TRUE)
 ```
+
+
+## Logarithmic Transformations
+
+```{r}
+cleaned_data_no_zeros$log_old_age_benefits <- log(cleaned_data_no_zeros$old_age_benefits + 1)
+lm_log <- lm(log_old_age_benefits ~ log(age_years + 1) + economic_status + region_name, data = cleaned_data_no_zeros)
+summary(lm_log)
+```
+
+
+## Interaction Terms and Higher-Order Models
+
+```{r}
+lm_high_interaction <- lm(old_age_benefits ~ age_years * region_name * economic_status, data = cleaned_data_no_zeros)
+# summary(lm_high_interaction)
+```
+
+
+
+# Further Refinement of the Model
+
+## Refining the Model with a New Predictor
+
+### Selecting a New Predictor
+
+From the dataset, potential predictors include:
+
+- **Household Size** (`household_size`): May influence benefits due to family circumstances or financial needs.
+- **Main Income Earner** (`main_income_earner`): Indicates whether the individual is the primary income provider in their household.
+
+We will test both predictors to determine which one better explains the variance in old_age_benefits.
+
+### Testing `household_size` as a Predictor
+
+```{r}
+lm_household <- lm(
+  old_age_benefits ~ household_size,
+  data = retirees_data
+)
+summary(lm_household)
+```
+
+
+```{r}
+lm_income <- lm(
+  old_age_benefits ~ main_income_earner,
+  data = retirees_data
+)
+summary(lm_income)
+
+```
+
+
+```{r}
+lm_combined <- lm(
+  old_age_benefits ~ household_size + main_income_earner,
+  data = retirees_data
+)
+summary(lm_combined)
+```
+
+## Refined Model: Main Income Earner and Household Size
+
+```{r}
+lm_refined <- lm(
+  old_age_benefits ~ household_size + main_income_earner,
+  data = retirees_data
+)
+summary(lm_refined)
+```
+
+
+### Adding Interaction Terms
+
+To capture potential joint effects, include an interaction term between household_size and main_income_earner.
+
+```{r}
+lm_interaction <- lm(
+  old_age_benefits ~ household_size * main_income_earner,
+  data = retirees_data
+)
+summary(lm_interaction)
+```
+
+
+### Testing Additional Predictor region_name
+
+```{r}
+lm_refined <- lm(
+  old_age_benefits ~ household_size * main_income_earner + region_name,
+  data = retirees_data
+)
+summary(lm_refined)
+
+```
+
+### Exploring Higher-Order Interactions
+
+```{r}
+lm_high_interaction <- lm(
+  old_age_benefits ~ household_size * main_income_earner * region_name,
+  data = retirees_data
+)
+summary(lm_high_interaction)
+
+```
+
