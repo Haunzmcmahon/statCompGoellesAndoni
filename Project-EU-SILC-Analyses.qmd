@@ -20,22 +20,14 @@ format:
   pdf: 
     output-file: Project-EU-SILC-Analyses.pdf 
     toc: true
-    toc-depth: 2
+    toc-depth: 3
     number-sections: true
     code-link: true
     df-print: tibble
-    crossref: 
-      lof-title: "List of Figures"
-      lot-title: "List of Tables"
 fig-align: center
 execute: 
   warning: false
 ---
-
-{{< pagebreak >}}
-
-\listoffigures 
-\listoftables
 
 {{< pagebreak >}}
 
@@ -46,22 +38,20 @@ execute:
 ```{r}
 #| code-summary: Libraries
 #| code-fold: true
+#| warning: false
 library <- function(...) {suppressPackageStartupMessages(base::library(...))}
 library(tidyverse)  # For data manipulation and visualization
-library(janitor)    # For cleaning column names and data
 library(knitr)      # For creating tables in reports
 library(rmarkdown)  # For rendering reports
 library(ggplot2)    # For creating visualizations
-library(corrplot)   # For correlation matrix visualizations
 library(kableExtra) # For formatting the data dictionary
-library(MASS)
-library(simFrame)
-library(dplyr)
-library(sjPlot)
-library(interactions)
-```
+library(MASS)       # For stepwise model selection
+library(simFrame)   # For loading the eusilcP dataset
+library(lme4)       # For mixed-effects models
+library(car)        # For diagnostic tools and visualizations
+library(effects)    # For visualizing the effects of predictors
 
-{{< pagebreak >}}
+```
 
 ## Data Collection
 
@@ -98,7 +88,7 @@ data_dictionary <- tibble::tibble(
 # Display the data dictionary as a formatted table
 knitr::kable(data_dictionary, caption = "Data Dictionary for EU-SILC Dataset") |> 
   kableExtra::kable_styling(full_width = FALSE, position = "center") |>
-  kableExtra::column_spec(2, width = "25em") # Adjust width of Description column
+  kableExtra::column_spec(2, width = "22em")
 ```
 
 ### Type of Survey and Execution
@@ -106,6 +96,8 @@ knitr::kable(data_dictionary, caption = "Data Dictionary for EU-SILC Dataset") |
 The EU-SILC is conducted as a household survey, combining personal interviews and administrative data. It gathers socioeconomic information at both the household and individual levels. The survey period typically spans a calendar year, ensuring comprehensive coverage of annual income and employment data.
 
 ```{r}
+#| warning: false
+#| code-fold: true
 # Load the eusilcP dataset
 data("eusilcP", package = "simFrame")
 # ?eusilcP
@@ -126,11 +118,12 @@ subset_data$region <- droplevels(subset_data$region)
 print(str(subset_data))
 ```
 
-### Data Cleaning
+{{< pagebreak >}} \### Data Cleaning
 
 To prepare the dataset for analysis, we renamed variables to make them more intuitive (e.g., py100n to old_age_benefits and ecoStat to economic_status) and removed rows with missing values, resulting in a loss of approximately 4,000 rows. This ensures the dataset is clean and reliable for analysis. Additionally, we recoded the numeric levels of economic_status into meaningful labels (e.g., 'FT_Work' for full-time work, 'Retired' for retired individuals) to improve interpretability, and converted household_size from categorical to numeric format to enable numerical comparisons in later analyses.
 
 ```{r}
+#| warning: false
 #| code-fold: true
 
 # Rename columns for clarity
@@ -244,7 +237,7 @@ This summary highlights differences across key variables, providing a foundation
 
 "This study aims to answer the following question: What factors influence the distribution of old-age benefits in East Austria, and how do these benefits vary across socioeconomic groups?"
 
-## Descriptive Analysis of the Sample
+{{< pagebreak >}} \## Descriptive Analysis of the Sample
 
 In this section, we will explore the key features of the data through various descriptive statistics and visualizations. These analyses will help us understand the distribution and relationships between variables, as well as identify any patterns or outliers.
 
@@ -303,6 +296,9 @@ knitr::kable(comparison_summary, caption = "Comparison of Key Variables Before a
 The age distribution of respondents is visualized below. The summary statistics highlight a slightly older sample, with most individuals aged between 30 and 60.
 
 ```{r age_histogram, echo=TRUE, fig.align="center"}
+#| fig.width: 6
+#| fig.height: 3
+
 # Histogram for age
 ggplot(data = cleaned_data_no_zeros, aes(x = age_years)) +
   geom_histogram(binwidth = 5, fill = "steelblue", color = "black") +
@@ -319,6 +315,9 @@ The histogram shows a concentration of respondents between 30 and 60 years old. 
 The first variable we will explore is **old_age_benefits**. We will visualize its distribution to check for any skewness and identify outliers.
 
 ```{r}
+#| fig.width: 6
+#| fig.height: 3
+
 # Histogram for positive old_age_benefits
 ggplot(data = cleaned_data_no_zeros, aes(x = old_age_benefits)) +
   geom_histogram(binwidth = 1000, fill = "steelblue", color = "black") +
@@ -329,6 +328,9 @@ ggplot(data = cleaned_data_no_zeros, aes(x = old_age_benefits)) +
 The histogram for positive old_age_benefits shows a right-skewed distribution, with most values concentrated at lower benefit amounts. This indicates that while many individuals receive some benefits, only a small proportion receive high amounts.
 
 ```{r}
+#| fig.width: 6
+#| fig.height: 3
+
 # Employment Status (Bar plot with percentage)
 ggplot(cleaned_data_no_zeros, aes(x = main_income_earner)) +
   geom_bar(aes(y = (after_stat(count))/sum(after_stat(count))), fill = "lightgreen", color = "black", alpha = 0.7) +
@@ -341,18 +343,22 @@ ggplot(cleaned_data_no_zeros, aes(x = main_income_earner)) +
 This simple barplot shows that around 65% of participants are the main income earners of their households.
 
 ```{r}
+#| fig.width: 6
+#| fig.height: 3
+
 # Economic Status (Bar plot)
 ggplot(cleaned_data_no_zeros, aes(x = economic_status)) +
   geom_bar(fill = "salmon", color = "black", alpha = 0.7) +
   labs(title = "Economic Status Distribution", x = "Economic Status", y = "Count") +
   theme_minimal()
-
-
 ```
 
 The previous barplot clearly shows that the biggest part of surveyants are working full time, the second largest group are retirees followed by individuals fulfilling domestic tasks and care responsibilities. The number of people that are working part time, are unemployed or studying each make up a similar share of the dataset. The lowest number of participants are either permanently disabled or/and unfit to work.
 
 ```{r}
+#| fig.width: 6
+#| fig.height: 3
+
 # Household Size (Histogram)
 ggplot(cleaned_data_no_zeros, aes(x = household_size)) +
   geom_histogram(binwidth = 1, fill = "lightcoral", color = "black", alpha = 0.7) +
@@ -363,6 +369,9 @@ ggplot(cleaned_data_no_zeros, aes(x = household_size)) +
 The household size distribution in the dataset is right-skewed, with the majority of households consisting of 1 to 4 members. The most common household size is 2 members, followed by 3 and 1 member households. As household size increases, the frequency rapidly decreases, with very few households having 5 or more members. This results in a long tail on the right side, indicating that while smaller households are more frequent, larger households are much less common.
 
 ```{r}
+#| fig.width: 6
+#| fig.height: 3
+
 # Age (Histogram)
 ggplot(cleaned_data_no_zeros, aes(x = age_years)) +
   geom_histogram(binwidth = 5, fill = "lightyellow", color = "black", alpha = 0.7) +
@@ -439,6 +448,9 @@ The boxplot and summary of Old Age Benefits by Economic Status reveal considerab
 #### Household Size vs. Old Age Benefits: Scatter plot to show how household size affects old-age benefits.
 
 ```{r, fig.align='center'}
+#| fig.width: 6
+#| fig.height: 3
+
 # Household Size vs Old Age Benefits (Scatter plot)
 ggplot(cleaned_data_no_zeros, aes(x = household_size, y = old_age_benefits)) +
   geom_point(color = "darkred", alpha = 0.5) +
@@ -534,13 +546,13 @@ ggplot(cleaned_data_no_zeros, aes(x = factor(household_size), y = old_age_benefi
 
 These Facet-based Plots show that for all economic status apart from Retired, FT_Work and Domestic almost no surveyants earn old age benefits that are not equal to 0€. For the economic status FT_Work and Domestic a large number of outliers show participants that earn non zero amounts of old age benefits. The one plot that allows us to interpret further is the one showing the economic status Retired. On this boxplot it is visible that across all household sizes the median old age benefits remain fairly similar. The number of outliers is higher for smaller households, which could be because most participants are in households with 1-3 inhabitants.
 
-{{< pagebreak >}} \
+{{< pagebreak >}} 
 
 # Statistical Modeling
 
 ## Introduction
 
-The Statistical Modeling chapter aims to investigate the key factors influencing old-age benefits (`old_age_benefits`) in East Austria. Building on the descriptive statistics presented earlier, this section quantifies the relationships between old-age benefits and several explanatory variables using linear regression techniques. The primary goal is to understand how these factors individually and collectively contribute to variations in benefits and how benefits vary across socioeconomic groups.
+This section investigates the factors influencing old-age benefits in East Austria using linear regression techniques. The goal is to quantify the effects of predictors, identify significant interactions, and address diagnostic issues to ensure robust model performance. Key steps include exploratory data analysis (EDA), baseline modeling, model refinement, and subgroup analysis.
 
 Given that `old_age_benefits` is a continuous dependent variable, linear regression is an appropriate method for modeling these relationships. The predictors considered include:
 
@@ -590,7 +602,7 @@ To achieve these objectives, the following steps will be undertaken:
 
 The chapter will conclude by identifying the most significant predictors of old-age benefits, discussing the implications of these findings, and highlighting potential areas for further analysis. In addition, any limitations of the model, such as unexplained variability or non-significant predictors, will be addressed, and suggestions for potential refinements or alternative modeling approaches will be proposed.
 
-{{< pagebreak >}} \
+{{< pagebreak >}}
 
 ## Exploratory Data Analysis (EDA)
 
@@ -641,7 +653,6 @@ aov_region <- aov(old_age_benefits ~ region_name, data = cleaned_data)
 summary(aov_region)
 ```
 
-
 ### ANOVA Results
 
 The ANOVA tests for `economic_status` and `region_name` reveal important insights into the relationship between these categorical variables and `old_age_benefits`.
@@ -651,9 +662,6 @@ The ANOVA tests for `economic_status` and `region_name` reveal important insight
 2.  **Region Name**: The ANOVA for region_name also shows a significant effect on `old_age_benefits` (F(2, 20701) = **13.35**, p = **1.61e-06**). This suggests that the region of the participants significantly influences the mean old-age benefits, with notable differences across regions.
 
 Both economic status and region have highly significant effects on old-age benefits, making them important predictors. These findings highlight the importance of considering both variables when modeling old-age benefits, as they contribute meaningfully to explaining the variations in the outcome.
-
-
-
 
 ## Baseline Linear Regression Model
 
@@ -676,95 +684,81 @@ summary(lm_baseline)
 
 #### Coefficients:
 
-- **Age** (`age_years`):
-  - Coefficient: -43.68 (p < 0.001).
-  - Interpretation: For each additional year of age, old-age benefits decrease by approximately €43.68 on average. This small but significant negative effect may reflect policy caps or other age-related factors.
-
-- **Economic Status** (`economic_status`):
-  - Retired individuals receive significantly higher pensions compared to full-time workers (reference group), with a coefficient of 4404.07 (p < 0.01).
-  - Domestic workers receive significantly lower pensions (-4453.93, p < 0.01).
-  - Other categories, such as part-time workers, unemployed individuals, and students, do not show statistically significant differences.
-
-- **Region** (`region_name`):
-  Residents of Vienna and Lower Austria receive significantly higher pensions compared to those in Burgenland:
-    - Vienna: 4280.49 (p < 0.001).
-    - Lower Austria: 1966.74 (p < 0.001).
-
-- **Household Size** (`household_size`):
-  - Coefficient: -57.12 (p = 0.664).
-  - Interpretation: Household size does not have a statistically significant effect on pension amounts.
-
+-   **Age** (`age_years`):
+    -   Coefficient: -43.68 (p \< 0.001).
+    -   Interpretation: For each additional year of age, old-age benefits decrease by approximately €43.68 on average. This small but significant negative effect may reflect policy caps or other age-related factors.
+-   **Economic Status** (`economic_status`):
+    -   Retired individuals receive significantly higher pensions compared to full-time workers (reference group), with a coefficient of 4404.07 (p \< 0.01).
+    -   Domestic workers receive significantly lower pensions (-4453.93, p \< 0.01).
+    -   Other categories, such as part-time workers, unemployed individuals, and students, do not show statistically significant differences.
+-   **Region** (`region_name`): Residents of Vienna and Lower Austria receive significantly higher pensions compared to those in Burgenland:
+    -   Vienna: 4280.49 (p \< 0.001).
+    -   Lower Austria: 1966.74 (p \< 0.001).
+-   **Household Size** (`household_size`):
+    -   Coefficient: -57.12 (p = 0.664).
+    -   Interpretation: Household size does not have a statistically significant effect on pension amounts.
 
 ### Model Fit
 
-- **Adjusted $R^2$**: 0.04733.
+-   **Adjusted** $R^2$: 0.04733.
 
-- **Multiple  $R^2$**: 0.04926.
+-   **Multiple** $R^2$: 0.04926.
 
-- **Residual Standard Error (RSE)**: 8881.
+-   **Residual Standard Error (RSE)**: 8881.
 
-- **F-statistic** and **p-value**: 25.5 (p < 2e-16).
-
+-   **F-statistic** and **p-value**: 25.5 (p \< 2e-16).
 
 The model explains approximately 4.93% of the variance in old-age benefits, indicating that additional predictors or interactions may be needed to improve explanatory power.
 
 The overall model is statistically significant, but the low $R^2$ suggests substantial unexplained variability.
 
-
 ### Diagnostic Checks
 
 To validate the assumptions of linear regression, we perform diagnostic checks:
 
-- Linearity:
-  - Residual plots are used to verify whether relationships between predictors and old_age_benefits are approximately linear.
-
-- Homoscedasticity:
-  - Residual variance is checked for constancy across fitted values.
-
-- Normality of Residuals:
-  - A Q-Q plot is used to assess whether residuals follow a normal distribution.
+-   Linearity:
+    -   Residual plots are used to verify whether relationships between predictors and old_age_benefits are approximately linear.
+-   Homoscedasticity:
+    -   Residual variance is checked for constancy across fitted values.
+-   Normality of Residuals:
+    -   A Q-Q plot is used to assess whether residuals follow a normal distribution.
 
 ```{r}
+#| fig.width: 6
+#| fig.height: 5
+
 # Diagnostic plots for baseline model
 par(mfrow = c(2, 2))
 plot(lm_baseline)
 
 ```
 
-
 ### Preliminary Observations
+
 Based on the diagnostic plots provided for the baseline linear regression model:
 
-- **Residuals vs Fitted Plot**:
-  - The residuals do not appear to be randomly scattered around zero, particularly at higher fitted values, suggesting potential non-linearity or heteroscedasticity (non-constant variance).
-  - There is a noticeable pattern where variability increases with fitted values, indicating heteroscedasticity.
-
-- **Q-Q Plot**:
-  - The Q-Q plot shows significant deviations from the theoretical quantiles at both tails, suggesting that the residuals are not normally distributed.
-  - This issue could impact the validity of statistical inferences made from the model.
-
-- **Scale-Location Plot**:
-  - The red trend line is not flat, and variability increases as fitted values increase. This confirms heteroscedasticity in the residuals.
-  - A transformation of the dependent variable (e.g., Box-Cox) might help stabilize variance.
-
-- **Residuals vs Leverage Plot**:
-  - Several points have high leverage and Cook's distance values, indicating they may be influential observations.
-  - Observations such as 29720, 45995, and 12440 should be investigated further to determine if they are outliers or leverage points that unduly influence the model.
-
-
+-   **Residuals vs Fitted Plot**:
+    -   The residuals do not appear to be randomly scattered around zero, particularly at higher fitted values, suggesting potential non-linearity or heteroscedasticity (non-constant variance).
+    -   There is a noticeable pattern where variability increases with fitted values, indicating heteroscedasticity.
+-   **Q-Q Plot**:
+    -   The Q-Q plot shows significant deviations from the theoretical quantiles at both tails, suggesting that the residuals are not normally distributed.
+    -   This issue could impact the validity of statistical inferences made from the model.
+-   **Scale-Location Plot**:
+    -   The red trend line is not flat, and variability increases as fitted values increase. This confirms heteroscedasticity in the residuals.
+    -   A transformation of the dependent variable (e.g., Box-Cox) might help stabilize variance.
+-   **Residuals vs Leverage Plot**:
+    -   Several points have high leverage and Cook's distance values, indicating they may be influential observations.
+    -   Observations such as 29720, 45995, and 12440 should be investigated further to determine if they are outliers or leverage points that unduly influence the model.
 
 ### Conclusion
 
 The diagnostic checks reveal several issues with the baseline linear regression model:
 
-- **Heteroscedasticity**: Variance of residuals increases with fitted values, violating the assumption of constant variance.
+-   **Heteroscedasticity**: Variance of residuals increases with fitted values, violating the assumption of constant variance.
 
-- **Non-Normality**: Residuals deviate significantly from normality, as shown in the Q-Q plot.
-Influential Observations: Certain data points have high leverage and may disproportionately affect model results.
+-   **Non-Normality**: Residuals deviate significantly from normality, as shown in the Q-Q plot. Influential Observations: Certain data points have high leverage and may disproportionately affect model results.
 
 To address these issues, we will apply a Box-Cox transformation to stabilize variance and improve normality of residuals. Next we will investigate and potentially remove influential observations to assess their impact on the model. Finally, we will consider adding interaction terms or non-linear transformations of predictors to better capture relationships between variables.
-
-
 
 ## Model Refinement Using Stepwise Selection
 
@@ -773,7 +767,6 @@ To address these issues, we will apply a Box-Cox transformation to stabilize var
 The baseline linear regression model provided an initial understanding of how predictors such as `age_years`, `economic_status`, `region_name`, and `household_size` influence old-age benefits. However, the diagnostic checks revealed issues such as heteroscedasticity, non-normality of residuals, and influential observations. Additionally, the low adjusted $R^2$ value indicated that the baseline model explains only a small proportion of the variance in old-age benefits.
 
 In this section, we refine the model using stepwise selection based on Akaike Information Criterion (AIC). This approach identifies the best subset of predictors by balancing model complexity and explanatory power. We also address issues identified in the diagnostic checks by considering transformations (e.g., Box-Cox) and focusing on retirees, who dominate the dataset.
-
 
 ### Stepwise Selection Process
 
@@ -785,7 +778,6 @@ stepwise_model <- stepAIC(lm_baseline, direction = "both")
 summary(stepwise_model)
 ```
 
-
 ### Results of Stepwise Selection
 
 ```{r}
@@ -795,52 +787,49 @@ lm_final <- lm(
 )
 summary(lm_final)
 ```
+
 #### Key Results
 
-- Age (age_years):
-  - Coefficient: -42.51 (p < 0.001).
-  - Interpretation: Each additional year of age is associated with a decrease of €42.51 in old-age benefits on average.
-  
-- Economic Status (economic_status):
-  - Retired individuals receive significantly higher pensions compared to full-time workers (reference group), with a coefficient of 4435.59 (p < 0.01).
-  - Domestic workers receive significantly lower pensions (-4470.64, p < 0.01).
-  - Other categories (e.g., part-time workers, unemployed) do not show statistically significant differences.
-
-- Region (region_name):
-  - Residents of Vienna and Lower Austria receive significantly higher pensions compared to those in Burgenland:
-    - Vienna: 4309.64 (p < 0.001).
-    - Lower Austria: 1974.80 (p < 0.001).
-
+-   Age (age_years):
+    -   Coefficient: -42.51 (p \< 0.001).
+    -   Interpretation: Each additional year of age is associated with a decrease of €42.51 in old-age benefits on average.
+-   Economic Status (economic_status):
+    -   Retired individuals receive significantly higher pensions compared to full-time workers (reference group), with a coefficient of 4435.59 (p \< 0.01).
+    -   Domestic workers receive significantly lower pensions (-4470.64, p \< 0.01).
+    -   Other categories (e.g., part-time workers, unemployed) do not show statistically significant differences.
+-   Region (region_name):
+    -   Residents of Vienna and Lower Austria receive significantly higher pensions compared to those in Burgenland:
+        -   Vienna: 4309.64 (p \< 0.001).
+        -   Lower Austria: 1974.80 (p \< 0.001).
 
 #### Model Fit:
-- Adjusted $R^2$: 0.04749.
-- Residual Standard Error (RSE): 8880.
-- F-statistic: 28.32 (p < 2e-16).
 
+-   Adjusted $R^2$: 0.04749.
+-   Residual Standard Error (RSE): 8880.
+-   F-statistic: 28.32 (p \< 2e-16).
 
-### Diagnostic Checks for Final Model
+{{< pagebreak >}} \### Diagnostic Checks for Final Model
 
 After refining the model, diagnostic checks are performed to validate its assumptions:
 
-- Residuals vs Fitted Plot:
-  - The residuals still show signs of heteroscedasticity, suggesting that variance increases with fitted values.
-
-- Q-Q Plot:
-  - Deviations from normality persist at both tails, indicating that residuals are not perfectly normally distributed.
-
-- Scale-Location Plot:
-  - Variance appears to increase with fitted values, confirming heteroscedasticity.
-
-- Residuals vs Leverage Plot:
-  - Influential observations remain present but have reduced leverage compared to the baseline model. 
+-   Residuals vs Fitted Plot:
+    -   The residuals still show signs of heteroscedasticity, suggesting that variance increases with fitted values.
+-   Q-Q Plot:
+    -   Deviations from normality persist at both tails, indicating that residuals are not perfectly normally distributed.
+-   Scale-Location Plot:
+    -   Variance appears to increase with fitted values, confirming heteroscedasticity.
+-   Residuals vs Leverage Plot:
+    -   Influential observations remain present but have reduced leverage compared to the baseline model.
 
 ```{r}
+#| fig.width: 6
+#| fig.height: 5
+
 # Diagnostic plots for final model
 par(mfrow = c(2, 2))
 plot(lm_final)
 
 ```
-
 
 ### Addressing Diagnostic Issues
 
@@ -851,26 +840,20 @@ To address heteroscedasticity and non-normality, we apply a Box-Cox transformati
 ```{r}
 boxcox_transformed <- boxcox(lm_final, lambda = seq(-2, 2, by = 0.1))
 lambda_optimal <- boxcox_transformed$x[which.max(boxcox_transformed$y)]
-
 # Apply Box-Cox transformation
 cleaned_data_no_zeros$boxcox_old_age_benefits <- 
   (cleaned_data_no_zeros$old_age_benefits^lambda_optimal - 1) / lambda_optimal
 
 lm_boxcox <- lm(
   boxcox_old_age_benefits ~ age_years + economic_status + region_name,
-  data = cleaned_data_no_zeros
-)
+  data = cleaned_data_no_zeros)
 summary(lm_boxcox)
-
 ```
-
 
 #### Key Results After Transformation:
 
-- The Box-Cox transformation improved residual diagnostics but did not significantly enhance explanatory power ($R^2$ remained low).
-- The relationship between predictors and old_age_benefits remains consistent with the untransformed model.
-
-
+-   The Box-Cox transformation improved residual diagnostics but did not significantly enhance explanatory power ($R^2$ remained low).
+-   The relationship between predictors and old_age_benefits remains consistent with the untransformed model.
 
 ### Subgroup Analysis: Retirees Only
 
@@ -888,57 +871,47 @@ summary(lm_retirees)
 
 ```
 
-
 ### Key Results for Retirees
 
-- Age (age_years):
-  - Coefficient: -48.70 (p < 0.001).
-  - Interpretation: For each additional year of age, old-age benefits decrease by approximately €48.70 on average. This negative relationship may reflect policy caps or diminishing benefits at older ages.
-
-- Region (region_name):
-  - Residents of Vienna receive significantly higher pensions compared to those in Burgenland, with a coefficient of 4310.99 (p < 0.001).
-  - Residents of Lower Austria also receive higher pensions compared to Burgenland, with a coefficient of 1953.49 (p < 0.001).
-
-- Model Fit:
-  - Adjusted $R^2$: 0.02831.
-  - Interpretation: The model explains approximately 2.83% of the variance in old-age benefits among retirees, indicating that additional predictors or interactions are needed to improve explanatory power.
+-   Age (age_years):
+    -   Coefficient: -48.70 (p \< 0.001).
+    -   Interpretation: For each additional year of age, old-age benefits decrease by approximately €48.70 on average. This negative relationship may reflect policy caps or diminishing benefits at older ages.
+-   Region (region_name):
+    -   Residents of Vienna receive significantly higher pensions compared to those in Burgenland, with a coefficient of 4310.99 (p \< 0.001).
+    -   Residents of Lower Austria also receive higher pensions compared to Burgenland, with a coefficient of 1953.49 (p \< 0.001).
+-   Model Fit:
+    -   Adjusted $R^2$: 0.02831.
+    -   Interpretation: The model explains approximately 2.83% of the variance in old-age benefits among retirees, indicating that additional predictors or interactions are needed to improve explanatory power.
 
 #### Preliminary Observations from Diagnostic Plots
 
-- Residuals vs Fitted Plot:
-  - The residuals show heteroscedasticity, with variance increasing at higher fitted values.
-  - This indicates a violation of the assumption of constant variance.
-
-- Q-Q Plot:
-  - The Q-Q plot shows deviations from normality at both tails, suggesting that residuals are not normally distributed.
-
-- Scale-Location Plot:
-  - Variance increases as fitted values increase, confirming heteroscedasticity.
-
-- Residuals vs Leverage Plot:
-  - Observations such as 29720, 45995, and 12440 have high leverage and Cook's distance values, indicating they may disproportionately influence the model.
-
-
+-   Residuals vs Fitted Plot:
+    -   The residuals show heteroscedasticity, with variance increasing at higher fitted values.
+    -   This indicates a violation of the assumption of constant variance.
+-   Q-Q Plot:
+    -   The Q-Q plot shows deviations from normality at both tails, suggesting that residuals are not normally distributed.
+-   Scale-Location Plot:
+    -   Variance increases as fitted values increase, confirming heteroscedasticity.
+-   Residuals vs Leverage Plot:
+    -   Observations such as 29720, 45995, and 12440 have high leverage and Cook's distance values, indicating they may disproportionately influence the model.
 
 ### Conclusion
+
 The refined model focusing on retirees highlights the following key findings:
 
-- **Age** has a small but significant negative effect on pension amounts.
+-   **Age** has a small but significant negative effect on pension amounts.
 
-- **Regional disparities** exist, with residents of Vienna and Lower Austria receiving higher pensions compared to Burgenland.
+-   **Regional disparities** exist, with residents of Vienna and Lower Austria receiving higher pensions compared to Burgenland.
 
-- Despite these findings, the model explains only a small proportion of the variance in old-age benefits among retirees ( $R^2$ = 2.83%), suggesting that additional factors or interactions may be needed to improve explanatory power.
-
-
+-   Despite these findings, the model explains only a small proportion of the variance in old-age benefits among retirees ( $R^2$ = 2.83%), suggesting that additional factors or interactions may be needed to improve explanatory power.
 
 ## Exploring Interaction Terms and Alternative Modeling Approaches
 
 In this section, we address the limitations of the current model, including heteroscedasticity, non-normality of residuals, and influential observations. Two approaches are explored to improve the model's performance and address these issues:
 
-- Adding interaction terms to capture joint effects between predictors.
+-   Adding interaction terms to capture joint effects between predictors.
 
-- Using mixed-effects models to account for hierarchical or grouped structures in the data.
-
+-   Using mixed-effects models to account for hierarchical or grouped structures in the data.
 
 ### Adding Interaction Terms
 
@@ -946,12 +919,9 @@ In this section, we address the limitations of the current model, including hete
 
 Interaction terms allow us to examine whether the relationship between one predictor (e.g., `age_years`) and the dependent variable (`old_age_benefits`) changes depending on the value of another predictor (e.g., `region_name` or `economic_status`). This makes the model more flexible and potentially improves its fit.
 
-
 #### Implementation
 
-We include interaction terms for:
-`age_years` and `region_name`: To explore whether the effect of age on benefits differs across regions.
-`age_years` and `economic_status`: To examine whether the effect of age varies across economic groups.
+We include interaction terms for: `age_years` and `region_name`: To explore whether the effect of age on benefits differs across regions. `age_years` and `economic_status`: To examine whether the effect of age varies across economic groups.
 
 ```{r}
 # Adding interaction terms
@@ -967,36 +937,31 @@ summary(lm_interaction)
 
 Based on the regression results that include interaction terms between age_years and region_name as well as age_years and economic_status:
 
-- Age (age_years):
-  - The main effect of age is not significant (p = 0.220), but several interaction terms involving age are significant, suggesting that the effect of age on old-age benefits depends on the region and economic status.
-
-- Region (region_name):
-  - Residents of Vienna receive significantly lower pensions compared to Burgenland when age is not considered (main effect: -6403.17, p < 0.05).
-  - The interaction terms indicate that the effect of age on benefits is stronger in Vienna (154.65, p < 0.001) and Lower Austria (86.13, p < 0.05) compared to Burgenland.
-
-- Economic Status (economic_status):
-  - Retired individuals receive significantly higher pensions (main effect: 17166.35, p < 0.01).
-  - Disabled individuals also receive significantly higher pensions (36699.53, p < 0.05).
-  - Interaction terms for age and economic status show that:
-The negative effect of age is stronger for retirees (-307.56, p < 0.05), disabled individuals (-878.74, p < 0.01), and domestic workers (-271.20, p < 0.05).
-
-- Model Fit:
-  - Adjusted $R^2$ : 0.05149.
-  - Residual Standard Error (RSE): 8861.
-  - Interpretation: Adding interaction terms slightly improves the model's explanatory power but does not fully address diagnostic issues.
-
+-   Age (age_years):
+    -   The main effect of age is not significant (p = 0.220), but several interaction terms involving age are significant, suggesting that the effect of age on old-age benefits depends on the region and economic status.
+-   Region (region_name):
+    -   Residents of Vienna receive significantly lower pensions compared to Burgenland when age is not considered (main effect: -6403.17, p \< 0.05).
+    -   The interaction terms indicate that the effect of age on benefits is stronger in Vienna (154.65, p \< 0.001) and Lower Austria (86.13, p \< 0.05) compared to Burgenland.
+-   Economic Status (economic_status):
+    -   Retired individuals receive significantly higher pensions (main effect: 17166.35, p \< 0.01).
+    -   Disabled individuals also receive significantly higher pensions (36699.53, p \< 0.05).
+    -   Interaction terms for age and economic status show that: The negative effect of age is stronger for retirees (-307.56, p \< 0.05), disabled individuals (-878.74, p \< 0.01), and domestic workers (-271.20, p \< 0.05).
+-   Model Fit:
+    -   Adjusted $R^2$ : 0.05149.
+    -   Residual Standard Error (RSE): 8861.
+    -   Interpretation: Adding interaction terms slightly improves the model's explanatory power but does not fully address diagnostic issues.
 
 ### Mixed-Effects Models
 
 #### Purpose
+
 Mixed-effects models address heteroscedasticity and non-normality by incorporating random effects that account for variability within groups (e.g., regions or economic statuses). This approach is particularly useful when data has a hierarchical structure.
 
-
 #### Implementation
+
 We use a random intercept model with region_name as a grouping variable:
 
 ```{r}
-library(lme4)
 
 # Mixed-effects model
 mixed_model <- lmer(
@@ -1009,56 +974,46 @@ summary(mixed_model)
 
 #### Key Results
 
-
 Based on the mixed-effects model with region_name as a random effect:
 
-- Age (age_years):
-  - Coefficient: -42.73 (p < 0.001).
-  - Interpretation: Each additional year of age is associated with a decrease of €42.73 in old-age benefits, consistent with previous models.
-
-- Economic Status (economic_status):
-  - Retired individuals receive significantly higher pensions (4440.47, p < 0.01).
-  - Domestic workers receive significantly lower pensions (-4463.35, p < 0.01).
-
-- Random Effects:
-  - Variance for region_name: 4539859.
-  - Residual variance: 78852810.
-  - Interpretation: The random intercept for regions captures some variability in benefits across regions but does not fully explain the variance.
-
-- Model Fit:
-  - REML Criterion: 103571.9.
-  - Residual Standard Error (RSE): 8880.
-  - Interpretation: The mixed-effects model does not substantially improve model fit compared to the fixed-effects models.
-
+-   Age (age_years):
+    -   Coefficient: -42.73 (p \< 0.001).
+    -   Interpretation: Each additional year of age is associated with a decrease of €42.73 in old-age benefits, consistent with previous models.
+-   Economic Status (economic_status):
+    -   Retired individuals receive significantly higher pensions (4440.47, p \< 0.01).
+    -   Domestic workers receive significantly lower pensions (-4463.35, p \< 0.01).
+-   Random Effects:
+    -   Variance for region_name: 4539859.
+    -   Residual variance: 78852810.
+    -   Interpretation: The random intercept for regions captures some variability in benefits across regions but does not fully explain the variance.
+-   Model Fit:
+    -   REML Criterion: 103571.9.
+    -   Residual Standard Error (RSE): 8880.
+    -   Interpretation: The mixed-effects model does not substantially improve model fit compared to the fixed-effects models.
 
 ### Conclusion
-- Adding Interaction Terms:
-  - Interaction terms reveal that the effect of age on old-age benefits varies by region and economic status.
-  - However, the overall improvement in model fit is modest, with Adjusted $R^2$ increasing only slightly to 5.15%.
 
-- Mixed-Effects Models:
-  - Including region_name as a random effect captures variability across regions but does not significantly improve explanatory power or address diagnostic issues.
-
-- Persistent Issues:
-  - Both models still exhibit heteroscedasticity and non-normality of residuals, as shown in the diagnostic plots.
-  - Influential observations remain, potentially affecting model estimates.
-
+-   Adding Interaction Terms:
+    -   Interaction terms reveal that the effect of age on old-age benefits varies by region and economic status.
+    -   However, the overall improvement in model fit is modest, with Adjusted $R^2$ increasing only slightly to 5.15%.
+-   Mixed-Effects Models:
+    -   Including region_name as a random effect captures variability across regions but does not significantly improve explanatory power or address diagnostic issues.
+-   Persistent Issues:
+    -   Both models still exhibit heteroscedasticity and non-normality of residuals, as shown in the diagnostic plots.
+    -   Influential observations remain, potentially affecting model estimates.
 
 ## Local Polynomial Regression Fitting
 
 ```{r}
-library(car)
 scatterplot(old_age_benefits ~ age_years, data = cleaned_data_no_zeros, smooth = list(style = "lines"), col = 1)
 
 ```
 
 The scatterplot shows the relationship between `age_years` (x-axis) and `old_age_benefits` (y-axis), with additional marginal boxplots for both variables. Key observations include:
 
-- A clear right-skewed distribution for `old_age_benefits`, as shown by the marginal boxplot on the left.
-- A relatively uniform distribution of `age_years`, with a slight concentration around retirement age (60–70 years).
-- The scatterplot suggests a weak or non-linear relationship between `age_years` and `old_age_benefits`, with high variability in benefits across all age groups.
-
-
+-   A clear right-skewed distribution for `old_age_benefits`, as shown by the marginal boxplot on the left.
+-   A relatively uniform distribution of `age_years`, with a slight concentration around retirement age (60–70 years).
+-   The scatterplot suggests a weak or non-linear relationship between `age_years` and `old_age_benefits`, with high variability in benefits across all age groups.
 
 ## Logarithmic Transformations
 
@@ -1067,45 +1022,16 @@ cleaned_data_no_zeros$log_old_age_benefits <- log(cleaned_data_no_zeros$old_age_
 lm_log <- lm(log_old_age_benefits ~ log(age_years + 1) + economic_status + region_name, data = cleaned_data_no_zeros)
 summary(lm_log)
 ```
-
-
-
-## Bivariate Kernel Density Estimates
-
-```{r}
-kde <- kde2d(cleaned_data_no_zeros$age_years, cleaned_data_no_zeros$old_age_benefits, n = 250)
-filled.contour(kde)
-```
-
-
-
 
 ## Scatterplot Matrices
 
 ```{r}
+#| fig.width: 6
+#| fig.height: 5
+#| 
 pairs(cleaned_data_no_zeros[, c("old_age_benefits", "age_years", "household_size")], panel = panel.smooth)
 
 ```
-
-<<<<<<< HEAD
-=======
-<<<<<<< HEAD
-
-
-=======
-```{r}
-# Adding region_name as a third predictor to the model
-lm_age_econ_region <- lm(old_age_benefits ~ region_name, data = cleaned_data_no_zeros_retirees_only)
->>>>>>> 70bce63f2a7a94b364089cb84f3e8f9a469f3f5f
-
-## Effect Plots for Interactions
-
-```{r}
-library(effects)
-effect_plot <- allEffects(lm_interaction)
-plot(effect_plot, multiline = TRUE)
-```
-
 
 ## Logarithmic Transformations
 
@@ -1114,7 +1040,6 @@ cleaned_data_no_zeros$log_old_age_benefits <- log(cleaned_data_no_zeros$old_age_
 lm_log <- lm(log_old_age_benefits ~ log(age_years + 1) + economic_status + region_name, data = cleaned_data_no_zeros)
 summary(lm_log)
 ```
-
 
 ## Interaction Terms and Higher-Order Models
 
@@ -1123,18 +1048,14 @@ lm_high_interaction <- lm(old_age_benefits ~ age_years * region_name * economic_
 # summary(lm_high_interaction)
 ```
 
-
-
-# Further Refinement of the Model
-
-## Refining the Model with a New Predictor
+{{< pagebreak >}} \## Refining the Model with a New Predictor
 
 ### Selecting a New Predictor
 
 From the dataset, potential predictors include:
 
-- **Household Size** (`household_size`): May influence benefits due to family circumstances or financial needs.
-- **Main Income Earner** (`main_income_earner`): Indicates whether the individual is the primary income provider in their household.
+-   **Household Size** (`household_size`): May influence benefits due to family circumstances or financial needs.
+-   **Main Income Earner** (`main_income_earner`): Indicates whether the individual is the primary income provider in their household.
 
 We will test both predictors to determine which one better explains the variance in old_age_benefits.
 
@@ -1148,7 +1069,6 @@ lm_household <- lm(
 summary(lm_household)
 ```
 
-
 ```{r}
 lm_income <- lm(
   old_age_benefits ~ main_income_earner,
@@ -1158,7 +1078,6 @@ summary(lm_income)
 
 ```
 
-
 ```{r}
 lm_combined <- lm(
   old_age_benefits ~ household_size + main_income_earner,
@@ -1166,8 +1085,8 @@ lm_combined <- lm(
 )
 summary(lm_combined)
 ```
-<<<<<<< HEAD
 
+{{< pagebreak >}} 
 ## Refined Model: Main Income Earner and Household Size
 
 ```{r}
@@ -1177,7 +1096,6 @@ lm_refined <- lm(
 )
 summary(lm_refined)
 ```
-
 
 ### Adding Interaction Terms
 
@@ -1190,7 +1108,6 @@ lm_interaction <- lm(
 )
 summary(lm_interaction)
 ```
-
 
 ### Testing Additional Predictor region_name
 
@@ -1210,10 +1127,299 @@ lm_high_interaction <- lm(
   old_age_benefits ~ household_size * main_income_earner * region_name,
   data = retirees_data
 )
-summary(lm_high_interaction)
+# summary(lm_high_interaction)
+```
+
+Model Summary:
+
+- The model explains 16.68% of the variance in old_age_benefits (Multiple $R^2$ = 0.1668.
+- The adjusted $R^2$ is slightly lower at 16.48%, indicating modest explanatory power.
+- The overall model is statistically significant (p<2.2×10−16).
+
+```{r}
+lm_refined <- lm(
+  old_age_benefits ~ household_size * main_income_earner + region_name,
+  data = retirees_data
+)
+summary(lm_refined)
+```
+
+```{r}
+#| fig.width: 6
+#| fig.height: 4
+
+par(mfrow = c(2, 2))
+plot(lm_refined)
 
 ```
 
-=======
->>>>>>> 20eb8b41edc06c85ce08713c50c030fb27decf6d
->>>>>>> 70bce63f2a7a94b364089cb84f3e8f9a469f3f5f
+```{r}
+boxcox_transformed <- boxcox(lm_refined, lambda = seq(-2, 2, by = 0.1))
+lambda_optimal <- boxcox_transformed$x[which.max(boxcox_transformed$y)]
+
+retirees_data$boxcox_old_age_benefits <- 
+  (retirees_data$old_age_benefits^lambda_optimal - 1) / lambda_optimal
+
+lm_boxcox <- lm(
+  boxcox_old_age_benefits ~ household_size * main_income_earner + region_name,
+  data = retirees_data
+)
+summary(lm_boxcox)
+
+```
+
+```{r}
+#| fig.width: 6
+#| fig.height: 5
+#| 
+par(mfrow = c(2, 2))
+plot(lm_boxcox)
+```
+
+```{r}
+#| fig.width: 8
+#| fig.height: 6
+
+# Generate effect plot
+effect_plot <- allEffects(lm_boxcox)
+# Customize the plot
+plot(effect_plot,
+  multiline = TRUE,                    # Display multiple lines in one plot
+  rug = FALSE,                         # Remove rug marks for cleaner appearance
+  ci.style = "bands",                  # Use shaded confidence bands instead of error bars
+  key.args = list(space = "top"),      # Move legend to the top for better readability
+  lines = list(lwd = 2),               # Increase line width for better visibility
+  axes = list(
+    x = list(cex = 1.2),               # Increase font size for x-axis labels
+    y = list(cex = 1.2)                # Increase font size for y-axis labels
+  ),
+  main = "Effect Plot with Interactions", # Add a descriptive title
+  xlab = "Predictor Variables",        # Customize x-axis label
+  ylab = "Box-Cox Transformed Benefits" # Customize y-axis label
+)
+```
+
+## Final Model Interpretation
+
+This section interprets the final refined model, focusing on parameter significance, confidence intervals, explanatory power ($R^2$), and effect sizes. Additionally, visualizations such as effect plots and posterior predictive checks are included to assess the model's performance and relate findings to the research question.
+
+### Model Equation
+
+The final refined model includes the predictors household_size, main_income_earner, and region_name, along with their interactions. The Box-Cox transformation was applied to stabilize variance. The model equation is:
+
+$B = \beta_{0} + \beta_{1}*(Household Size) + \beta_{2}*Main Income Earner+\beta_{3}*Region Name+\beta_{4}(Household Size×Main Income Earner)+\epsilon$
+
+Where:
+
+- B:  BoxCox Transformed Old Age Benefits
+- $\beta_{0}$ : Intercept
+- $\beta_{1}$, $\beta_{2}$, $\beta_{3}$, $\beta_{4}$  : Coefficients for predictors and interactions
+- $\epsilon$: Residual error
+
+
+### Key Results
+
+```{r}
+#| tbl-cap: "Key Results from the Final Model"
+#| echo: false
+#| code-fold: false
+
+# Create a tibble for the key results
+key_results_final <- tibble::tibble(
+  Predictor = c(
+    "Intercept",
+    "Household Size",
+    "Main Income Earner (TRUE)",
+    "Region: Lower Austria",
+    "Region: Vienna",
+    "Household Size × Main Income Earner (TRUE)"
+  ),
+  Coefficient = c(
+    105.33,
+    1.80,
+    14.51,
+    8.77,
+    17.33,
+    6.95
+  ),
+  `Std. Error` = c(
+    2.48,
+    0.77,
+    2.39,
+    1.45,
+    1.51,
+    0.99
+  ),
+  `p-value` = c(
+    "<0.001",
+    "0.020",
+    "<0.001",
+    "<0.001",
+    "<0.001",
+    "<0.001"
+  ),
+  Significance = c("***", "*", "***", "***", "***", "***")
+)
+
+
+# Display the table with formatting
+knitr::kable(key_results_final, caption = "Key Results from the Final Model") |>
+  kableExtra::kable_styling(full_width = TRUE, position = "center") |>
+  kableExtra::column_spec(1, width = "12em" ,bold = TRUE) |>
+  kableExtra::column_spec(2:5, width = "6em")
+```
+
+
+### Interpretation of Coefficients
+
+- **Intercept**: The baseline Box-Cox transformed old-age benefits for a non-main income earner in Burgenland with a household size of 1 is approximately 105.33.
+- **Household Size**: For each additional household member, old-age benefits increase by 1.80 units on average (p = 0.020), holding other variables constant.
+- **Main Income Earner**: Main income earners receive 14.51 units more in Box-Cox transformed benefits compared to non-main income earners (p<0.001).
+- **Region**:
+  - Residents of Lower Austria receive 8.77 units more in benefits compared to Burgenland residents (p < 0.001).
+  - Residents of Vienna receive 17.33 units more in benefits compared to Burgenland residents (p < 0.001).
+- **Interaction** (Household Size × Main Income Earner): The positive interaction term (6.95, p < 0.001) suggests that the effect of household size on benefits is amplified for main income earners.
+
+### Model Fit and Explanatory Power
+
+- Adjusted $R^2$: 0.183
+- Residual Standard Error (RSE): 29.54
+- F-statistic: 213.5, $p<2e−16$
+
+The model explains approximately $18.3\%$ of the variance in old-age benefits, indicating that while the predictors are statistically significant, much of the variability remains unexplained.
+
+### Confidence Intervals
+Confidence intervals provide additional context for the precision of coefficient estimates:
+
+```{r}
+#| tbl-cap: "Confidence Intervals for Model Coefficients"
+#| echo: false
+#| code-fold: false
+
+# Generate confidence intervals for the model
+conf_intervals <- confint(lm_boxcox)
+
+# Create a tibble for confidence intervals
+confidence_table <- tibble::tibble(
+  Predictor = rownames(conf_intervals),
+  `Lower Bound (2.5%)` = round(conf_intervals[, 1], 2),
+  `Upper Bound (97.5%)` = round(conf_intervals[, 2], 2)
+)
+
+# Display the table with formatting
+knitr::kable(confidence_table, caption = "Confidence Intervals for Model Coefficients") |>
+  kableExtra::kable_styling(full_width = FALSE, position = "center") |>
+  kableExtra::column_spec(1, bold = TRUE, width = "16em") |>
+  kableExtra::column_spec(2:3, width = "8em")
+```
+
+These intervals confirm that all statistically significant predictors have positive effects on old-age benefits.
+
+
+### Effect Plots
+
+Effect plots visually represent how predictors influence the dependent variable.
+
+- **Observations**:
+  - The interaction between household_size and main_income_earner shows a steeper increase in benefits for main income earners as household size grows.
+  - Regional disparities are evident, with Vienna consistently showing higher benefits than other regions.
+
+
+### Posterior Predictive Check
+
+Posterior predictive checks assess systematic discrepancies between real and simulated data.
+
+```{r}
+# Simulate data based on the final model
+set.seed(123)
+simulated <- predict(lm_boxcox) + rnorm(nrow(retirees_data), mean = 0, sd = sd(residuals(lm_boxcox)))
+
+# Compare distributions
+library(ggplot2)
+ggplot(data.frame(Real = retirees_data$boxcox_old_age_benefits, Simulated = simulated)) +
+    geom_density(aes(x = Real), fill = "blue", alpha = 0.5) +
+    geom_density(aes(x = Simulated), fill = "red", alpha = 0.5) +
+    labs(title = "Posterior Predictive Check", x = "Box-Cox Transformed Benefits", y = "Density") +
+    theme_minimal()
+
+```
+
+
+- **Observation**:
+  - The density plot shows good overlap between real and simulated data distributions, indicating that the model captures key patterns without major systematic discrepancies.
+
+
+### Relating Findings to the Research Question
+
+The research question asks: What factors influence the distribution of old-age benefits in East Austria?
+
+
+**Key Insights**:
+
+- Economic Status:
+  - Main income earners receive higher benefits, reflecting their financial contribution to households.
+- Regional Disparities:
+  - Residents of Vienna and Lower Austria receive higher benefits than those in Burgenland, likely due to regional policy differences or cost-of-living adjustments.
+- Household Dynamics:
+  - Larger households tend to receive higher benefits, especially when the recipient is a main income earner.
+- Age Effect:
+  - While age was initially considered as a predictor, it was found to be statistically insignificant in earlier analyses and was subsequently excluded from the final model.
+  - This result underscores that factors such as household size, income earner status, and regional differences are more critical in determining old-age benefits than age itself.
+  
+
+{{< pagebreak >}}
+## Conclusion and Criticism
+
+### Summary
+This study aimed to investigate the factors influencing the distribution of old-age benefits in East Austria, focusing on socioeconomic and regional disparities. Using data from the EU-SILC survey, we performed a series of analyses, including exploratory data analysis, baseline modeling, and model refinement. The final model identified household size, main income earner status, and region as significant predictors of old-age benefits. Key findings include:
+
+- **Main Income Earner**: Individuals who are the main income earners in their households receive significantly higher benefits.
+- **Regional Disparities**: Residents of Vienna and Lower Austria receive higher benefits compared to those in Burgenland.
+- **Household Size**: Larger households tend to receive higher benefits, particularly when the recipient is a main income earner.
+
+The research question— *What factors influence the distribution of old-age benefits in East Austria?* —was addressed by identifying these key predictors and quantifying their effects.
+
+
+### Possible Problems
+
+**Data Problems**
+
+- Skewed Distribution of Benefits:
+  - The dependent variable (`old_age_benefits`) exhibited a highly skewed distribution with many zero values, reflecting individuals who do not receive any benefits. This necessitated filtering out zeros for regression analysis, potentially limiting the scope of the findings.
+- Regional Imbalance:
+  - The dataset contained unequal representation across regions, with Vienna and Lower Austria contributing significantly more observations than Burgenland. This imbalance may have influenced regional comparisons.
+- Missing Data:
+  - Approximately 4,000 rows were removed due to missing values, which could have introduced bias if the missing data were not random.
+  
+
+**Analysis Problems**
+
+- Low Explanatory Power:
+  - The final model explained only 18.3% of the variance in old-age benefits ($R^2 = 0.183$), indicating that important predictors may be missing or that the relationships are more complex than linear regression can capture.
+- Residual Diagnostics:
+  - Diagnostic checks revealed persistent heteroscedasticity and deviations from normality in residuals, even after applying a Box-Cox transformation. These issues may affect the validity of statistical inferences.
+- Influential Observations:
+  - Certain data points had high leverage and Cook's distance values, suggesting they disproportionately influenced model estimates.
+
+
+**Generalizability of the Findings**
+
+The findings are specific to East Austria (Vienna, Lower Austria, and Burgenland) and may not generalize to other regions or countries due to differences in socioeconomic structures and pension policies. Additionally:
+
+- The exclusion of individuals with zero benefits limits applicability to populations where non-recipients represent a significant proportion.
+- The dataset's reliance on self-reported survey data introduces potential biases related to misreporting or incomplete responses.
+
+
+
+**Conclusion**
+
+This study highlights the importance of socioeconomic and regional factors in shaping old-age benefits in East Austria. While the analysis identified significant predictors such as household size, main income earner status, and region, it also revealed limitations in explanatory power and residual diagnostics. Future research should explore additional predictors, nonlinear models, and subgroup analyses to provide a more comprehensive understanding of benefit distribution dynamics.
+
+
+
+
+
+
+
+
+
